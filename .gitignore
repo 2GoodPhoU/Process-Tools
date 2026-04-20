@@ -1,0 +1,60 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# ---- Virtual environments ----
+.venv/
+venv/
+env/
+ENV/
+
+# ---- Packaging / build artifacts ----
+build/
+dist/
+*.egg-info/
+*.egg
+pip-wheel-metadata/
+.eggs/
+
+# PyInstaller leftovers
+*.manifest
+*.spec.bak
+/pyinstaller-warn-*.txt
+
+# ---- Test / coverage ----
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.cache/
+
+# ---- Type checkers / linters ----
+.mypy_cache/
+.pyre/
+.pytype/
+.ruff_cache/
+
+# ---- Jupyter ----
+.ipynb_checkpoints/
+
+# ---- Editors / IDEs ----
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ---- OS noise ----
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---- Project-specific ----
+# Dogfooded outputs generated when running the tool on itself.
+# The canonical examples live in samples/ already.
+requirements-extractor/requirements.xlsx
+requirements-extractor/requirements_statement_set.csv
