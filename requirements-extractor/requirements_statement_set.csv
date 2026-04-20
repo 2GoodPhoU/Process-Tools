@@ -1,0 +1,50 @@
+﻿Level 1,Description 1,Level 2,Description 2,Level 3,Description 3,Level 4,Description 4,Level #,Description #
+3. System Requirements,,,,,,,,,
+,,3.1 Authentication,Access control is handled by the Auth Service.,,,,,,
+,,,,Auth Service 1,"Auth Service
+
+The Auth Service shall authenticate every user before granting access to protected resources.",,,,
+,,,,Auth Service 2,"Auth Service
+
+Failed login attempts must be rate-limited to five per minute per account.",,,,
+,,,,Auth Service 3,"Auth Service
+
+Passwords should be hashed with bcrypt.",,,,
+,,,,Auth Service 4,"Auth Service
+
+Sessions will expire after 30 minutes of inactivity.",,,,
+,,,,Auth Service 5,"Auth Service
+
+The Auth Service may cache public keys for up to one hour.",,,,
+,,,,Auth Service 6,"Auth Service
+
+Ground Control can override a lockout for operational emergencies.",,,,
+,,3.2 Telemetry,This section describes telemetry handling across subsystems.,,,,,,
+,,,,Flight Software 1,"Flight Software
+
+The Flight Software shall transmit telemetry packets to Ground Control at 1 Hz during nominal operations.",,,,
+,,,,Flight Software 2,"Flight Software
+
+Telemetry packets must include a timestamp, health bits, and a CRC-32 checksum.",,,,
+,,,,Flight Software 3,"Flight Software
+
+During safe mode, FSW should reduce telemetry rate to 0.1 Hz to conserve bandwidth.",,,,
+,,,,Ground Control 1,"Ground Control
+
+Ground Control shall acknowledge every telemetry burst within 3 seconds.",,,,
+,,,,Ground Control 2,"Ground Control
+
+Mission Control may request on-demand housekeeping packets during pass windows.",,,,
+,,3.3 Payload Operations,Payload activities are coordinated between Payload Operator and Flight Software.,,,,,,
+,,,,Payload Operator 1,"Payload Operator
+
+The Payload Operator shall schedule imaging tasks at least 24 hours in advance.",,,,
+,,,,Payload Operator 2,"Payload Operator
+
+Emergency tasking requests must be routed through Ground Control.",,,,
+,,,,Payload Operator 3,"Payload Operator
+
+PL Op should verify target coordinates before uploading a task.",,,,
+,,,,Payload Operator 4,"Payload Operator
+
+Note: this paragraph contains no requirement keywords and should not appear in the output.",,,,
