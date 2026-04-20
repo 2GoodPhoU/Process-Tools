@@ -1,0 +1,4 @@
+# Tools needed to produce a frozen executable.
+# Install into your build venv:
+#     pip install -r packaging/build-requirements.txt
+pyinstaller>=6.0

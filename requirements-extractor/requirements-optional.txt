@@ -1,0 +1,6 @@
+# Optional — only needed if you want to enable the --nlp feature
+# for detecting secondary actors via spaCy's named-entity recognition.
+#
+# After installing, also download the English model:
+#     python -m spacy download en_core_web_sm
+spacy>=3.7.0
