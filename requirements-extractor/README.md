@@ -1,8 +1,15 @@
-# Requirements Extractor
+# Document Data Extractor
 
-A small Python tool that reads one or more Word documents (`.docx`) and pulls out anything that looks like a requirement — shall/must/required statements (plus softer should/may/can/will items flagged for human review) — into a single tidy Excel workbook. It also flags **negative requirements** ("shall not", "must not", "can't") so prohibitions don't get lost in a long list of obligations.
+A small Python tool that pulls structured data out of Word documents (`.docx`).
 
-Each row in the output workbook is one requirement, with columns for traceability (file, section, table/row), the primary actor (from the first column of the 2-column table), any secondary actors referenced in the text, the requirement itself, and the matched keywords.
+It has two modes:
+
+- **Requirements mode** (the original use case) — reads one or more specs and pulls out anything that looks like a requirement — shall/must/required statements (plus softer should/may/can/will items flagged for human review) — into a single tidy Excel workbook. It also flags **negative requirements** ("shall not", "must not", "can't") so prohibitions don't get lost in a long list of obligations.
+- **Actors mode** — skips requirement detection entirely and harvests a canonical actors list from the document corpus, producing an `.xlsx` that can be fed straight back into the requirements run as `--actors`.
+
+In requirements mode, each row in the output workbook is one requirement, with columns for traceability (file, section, table/row), the primary actor (from the first column of the 2-column table), any secondary actors referenced in the text, the requirement itself, and the matched keywords.
+
+(The Python package is still called `requirements_extractor` internally — the rename is surface-level so existing imports and scripts keep working.)
 
 ---
 
@@ -99,39 +106,83 @@ From the `requirements-extractor/` folder, with the venv active:
 python run_gui.py
 ```
 
-A window opens. Add one or more `.docx` files (or a whole folder), optionally point at an actors list, choose where to save the output, and click **Run extraction**. A determinate progress bar tracks the per-file progress and a **Cancel** button can stop the run between files. When it finishes, the output file opens automatically (disable via the "Open output file when the run finishes" checkbox).
+A window opens. Pick **Extraction mode** (Requirements or Actors) at the top, add one or more `.docx` files (or a whole folder), optionally point at an actors list, choose where to save the output, and click **Run**. A determinate progress bar tracks the per-file progress and a **Cancel** button can stop the run between files. When it finishes, the output file opens automatically (disable via the "Open output file when the run finishes" checkbox). The statement-set section is only active in Requirements mode and greys out automatically when you switch to Actors mode.
 
 **Bonus conveniences:**
 
 - **Drag-and-drop** — drop `.docx` files or folders directly onto the input list. Requires `pip install tkinterdnd2` (optional — the UI degrades to buttons if it isn't installed).
 - **Save actors template\u2026** — click this button in the Actors section to generate a ready-to-fill `actors_template.xlsx` instead of hand-rolling one.
-- **Remembered settings** — window size, last-used paths, and checkbox states are persisted to `~/.requirements_extractor/settings.json` and restored next launch.
+- **Actors mode** — switch the top radio to "Actors" to run the parser across your inputs and produce a ready-to-use actors workbook from what the documents actually contain. See the "Actors mode" section below.
+- **Remembered settings** — window size, last-used paths, checkbox states, and the last-used mode are persisted to `~/.requirements_extractor/settings.json` and restored next launch.
 
 > Tip for Windows users: rename `run_gui.py` to `run_gui.pyw` to suppress the background console window when you double-click.
 
 ### B. The command line
 
+The CLI is subcommand-based: `document-data-extractor <MODE> [args]`.  The entry point is `extract.py` for the moment; the legacy flag-style invocation still works — it's transparently routed to the `requirements` subcommand.
+
 From the same folder, with the venv active:
+
 ```
+# Requirements mode (explicit subcommand)
+python extract.py requirements PATH_TO_DOCUMENT.docx -o output.xlsx
+
+# Requirements mode (legacy flag-style — auto-routed for backward compatibility)
 python extract.py PATH_TO_DOCUMENT.docx -o output.xlsx
 ```
 
 More examples:
 ```
 # Process every .docx in a folder (recursively)
-python extract.py C:\Projects\Specs -o specs.xlsx
+python extract.py requirements C:\Projects\Specs -o specs.xlsx
 
 # Multiple files, with an actors list
-python extract.py spec_a.docx spec_b.docx -o combined.xlsx --actors actors.xlsx
+python extract.py requirements spec_a.docx spec_b.docx -o combined.xlsx --actors actors.xlsx
 
 # Include the spaCy NER pass
-python extract.py spec.docx -o out.xlsx --nlp
+python extract.py requirements spec.docx -o out.xlsx --nlp
 
 # Also export a statement-set CSV (hierarchical paired-level format)
-python extract.py spec.docx -o out.xlsx --statement-set statement_set.csv
+python extract.py requirements spec.docx -o out.xlsx --statement-set statement_set.csv
+
+# Actors mode — build an actors list from a corpus instead of
+# extracting requirements.  Output round-trips into --actors.
+python extract.py actors C:\Projects\Specs -o actors_scan.xlsx
+
+# Aliases: `reqs` for requirements, `scan` for actors.
+python extract.py reqs spec.docx -o out.xlsx
+python extract.py scan C:\Projects\Specs -o actors.xlsx
 ```
 
-Run `python extract.py --help` to see every option.
+Run `python extract.py --help` to see every option, or `python extract.py requirements --help` / `python extract.py actors --help` for mode-specific flags.
+
+---
+
+## Actors mode
+
+The requirements run detects requirements as its main job and tracks actors as a side effect. If you're bootstrapping an actors list — or auditing an existing corpus for the actors it actually mentions — you can skip requirement detection entirely and just harvest actors.
+
+CLI:
+```
+python extract.py actors C:\Projects\Specs -o actors_scan.xlsx
+
+# With a seed — preserves your canonical names verbatim and only
+# adds new spellings discovered in the corpus as aliases.
+python extract.py actors C:\Projects\Specs --actors seed.xlsx -o actors_scan.xlsx
+```
+
+GUI: switch the top radio to **Actors**, choose an output path in section 5, then click **Run**.
+
+What you get: an `.xlsx` with three sheets. The **Actors** sheet has the exact `Actor` / `Aliases` column layout that `--actors` consumes on a requirements run, plus diagnostic columns (count, files, first seen, sources) that the loader ignores. The **Observations** sheet lists every raw sighting so false positives are easy to audit. The **Readme** sheet explains the workflow.
+
+The typical flow is:
+
+1. Run actors mode on your corpus.
+2. Open the output, rename canonicals, delete rows for false positives, merge aliases.
+3. Save it and pass it as `--actors your_actors.xlsx` on the next requirements run.
+4. Optionally: re-run actors mode with `--actors your_actors.xlsx` as a seed as the corpus grows — the seeded canonicals are preserved verbatim and only new spellings get added as aliases.
+
+This complements the **Save actors template…** button in the GUI: *template* creates a blank file to fill in by hand; *actors mode* creates one pre-populated from your documents.
 
 ---
 
@@ -307,7 +358,7 @@ packaging\build.bat
 You'll find the result at:
 
 ```
-dist\RequirementsExtractor.exe
+dist\DocumentDataExtractor.exe
 ```
 
 Copy that single file anywhere — desktop, network share, Teams — and double-click to launch. No Python install required on the target machine.
@@ -318,7 +369,7 @@ Just re-run `packaging\build.bat`. It cleans the previous `build/` and `dist/` f
 
 ### Troubleshooting the build
 
-- **"ModuleNotFoundError" at runtime for some spaCy submodule** — add the missing module name to the `_bundle("...")` list at the top of `packaging/RequirementsExtractor.spec` and rebuild.
+- **"ModuleNotFoundError" at runtime for some spaCy submodule** — add the missing module name to the `_bundle("...")` list at the top of `packaging/DocumentDataExtractor.spec` and rebuild.
 - **"en_core_web_sm not found" at runtime** — you forgot `python -m spacy download en_core_web_sm` in the build venv. The spec collects the model at build time; if it's not installed, the bundled exe won't have it.
 - **Exe is huge** — that's spaCy + its model. If you don't need the NLP feature, remove every entry in the `for _pkg in (...)` block of the spec except the first block; the exe will drop to around 60 MB.
 - **Exe launches then closes immediately** — rebuild with `console=True` in the spec so you can see the error traceback, fix it, then switch back to `console=False`.
@@ -351,27 +402,29 @@ Most tuning should happen through a **config file** (see the "Config file" secti
 ## Project layout
 
 ```
-requirements-extractor/
+requirements-extractor/                (folder name — Python pkg kept for compat)
 ├── README.md                          (this file)
 ├── requirements.txt                   (core Python deps)
 ├── requirements-optional.txt          (optional spaCy deps)
-├── extract.py                         (CLI shortcut)
+├── extract.py                         (CLI shortcut — legacy flag-style still works)
 ├── run_gui.py                         (GUI shortcut)
 ├── packaging/                         (PyInstaller build config)
-│   ├── RequirementsExtractor.spec
+│   ├── DocumentDataExtractor.spec
 │   ├── build.bat                      (Windows build)
 │   ├── build.sh                       (macOS/Linux build)
 │   └── build-requirements.txt
 ├── samples/                           (sample files for testing)
-└── requirements_extractor/
+└── requirements_extractor/            (Python package — import path unchanged)
     ├── __init__.py
     ├── models.py                      (dataclasses + event types)
     ├── detector.py                    (hard/soft keyword classifier)
     ├── actors.py                      (primary + secondary actor resolution)
+    ├── actor_scan.py                  (actors-only extraction mode)
     ├── parser.py                      (walks the .docx into an event stream)
     ├── writer.py                      (writes the .xlsx output)
     ├── statement_set.py               (writes the statement-set .csv output)
-    ├── extractor.py                   (orchestrator)
-    ├── cli.py                         (command-line interface)
-    └── gui.py                         (Tkinter GUI)
+    ├── extractor.py                   (orchestrator for requirements mode)
+    ├── cli.py                         (subcommand CLI — document-data-extractor)
+    ├── gui.py                         (Tkinter GUI)
+    └── gui_state.py                   (Tk-free settings/helpers)
 ```

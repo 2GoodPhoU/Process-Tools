@@ -44,7 +44,27 @@ class TestGuiSettingsDefaults(unittest.TestCase):
         self.assertFalse(s.use_nlp)
         self.assertFalse(s.export_statement_set)
         self.assertTrue(s.open_output_on_done)
+        self.assertEqual(s.mode, "requirements")
         self.assertEqual(s.recent_inputs, [])
+
+
+class TestGuiSettingsMode(unittest.TestCase):
+    def test_known_modes_round_trip(self) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "s.json"
+            for m in ("requirements", "actors"):
+                GuiSettings(mode=m).save(path)
+                self.assertEqual(GuiSettings.load(path).mode, m)
+
+    def test_unknown_mode_on_disk_falls_back(self) -> None:
+        """A hand-edited or future-version settings file with a bogus
+        mode value must not wedge the GUI."""
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "s.json"
+            path.write_text(
+                json.dumps({"mode": "quantum"}), encoding="utf-8",
+            )
+            self.assertEqual(GuiSettings.load(path).mode, "requirements")
 
 
 class TestGuiSettingsRoundtrip(unittest.TestCase):

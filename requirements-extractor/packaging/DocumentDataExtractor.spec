@@ -1,11 +1,11 @@
 # -*- mode: python ; coding: utf-8 -*-
-# PyInstaller spec file for the Requirements Extractor GUI.
+# PyInstaller spec file for the Document Data Extractor GUI.
 #
 # Build with:
-#     pyinstaller packaging/RequirementsExtractor.spec --clean --noconfirm
+#     pyinstaller packaging/DocumentDataExtractor.spec --clean --noconfirm
 #
 # This produces a single-file windowed executable at:
-#     dist/RequirementsExtractor[.exe]
+#     dist/DocumentDataExtractor[.exe]
 #
 # The spec tries hard to include everything spaCy needs so the "--nlp"
 # option works in the bundled app without any extra install step.  If you
@@ -79,6 +79,7 @@ a = Analysis(
         "requirements_extractor.gui",
         "requirements_extractor.cli",
         "requirements_extractor.extractor",
+        "requirements_extractor.actor_scan",
         "requirements_extractor.parser",
         "requirements_extractor.detector",
         "requirements_extractor.actors",
@@ -120,7 +121,7 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name="RequirementsExtractor",
+    name="DocumentDataExtractor",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

@@ -37,6 +37,7 @@ from tkinter import (
 )
 from tkinter.scrolledtext import ScrolledText
 
+from .actor_scan import ActorScanCancelled, scan_actors_from_files
 from .extractor import ExtractionCancelled, extract_from_files
 from .gui_state import (
     GuiSettings,
@@ -67,6 +68,16 @@ def _make_root() -> Tk:
     return Tk()
 
 
+# Default output filenames per mode.  Kept in sync with the CLI's
+# defaults in ``requirements_extractor.cli``.
+_DEFAULT_OUTPUT_NAMES = {"requirements.xlsx", "actors_scan.xlsx"}
+
+
+def _default_output_name(mode: str) -> str:
+    """Return the default output filename for the given mode."""
+    return "actors_scan.xlsx" if mode == "actors" else "requirements.xlsx"
+
+
 # ---------------------------------------------------------------------------
 # App
 # ---------------------------------------------------------------------------
@@ -76,15 +87,17 @@ class ExtractorApp:
     def __init__(self, root: Tk, *, settings: Optional[GuiSettings] = None) -> None:
         self.root = root
         self.settings: GuiSettings = settings if settings is not None else GuiSettings.load()
-        root.title("Requirements Extractor")
+        root.title("Document Data Extractor")
         root.geometry(self.settings.window_geometry)
 
         # Input state ---------------------------------------------------- #
         self.input_files: list[Path] = []
+        self.mode = StringVar(value=self.settings.mode)
         self.actors_file = StringVar(value=self.settings.last_actors_path)
         self.config_file = StringVar(value=self.settings.last_config_path)
         self.output_file = StringVar(
-            value=self.settings.last_output_path or str(Path.cwd() / "requirements.xlsx")
+            value=self.settings.last_output_path
+            or str(Path.cwd() / _default_output_name(self.settings.mode))
         )
         self.use_nlp = BooleanVar(value=self.settings.use_nlp)
         self.export_statement_set = BooleanVar(value=self.settings.export_statement_set)
@@ -112,6 +125,7 @@ class ExtractorApp:
         frm = ttk.Frame(self.root)
         frm.pack(fill="both", expand=True, padx=8, pady=8)
 
+        self._build_mode_section(frm, pad)
         self._build_input_section(frm, pad)
         self._build_actors_section(frm, pad)
         self._build_config_section(frm, pad)
@@ -119,6 +133,31 @@ class ExtractorApp:
         self._build_output_section(frm, pad)
         self._build_statement_set_section(frm, pad)
         self._build_run_section(frm, pad)
+        # Apply initial mode-dependent state (enables/disables ss section
+        # and adjusts output default for the current mode).
+        self._on_mode_change()
+
+    # --- section: mode --- #
+
+    def _build_mode_section(self, parent: ttk.Frame, pad: dict) -> None:
+        frame = ttk.LabelFrame(parent, text="Extraction mode")
+        frame.pack(fill="x", **pad)
+        row = ttk.Frame(frame)
+        row.pack(fill="x", padx=4, pady=4)
+        ttk.Radiobutton(
+            row,
+            text="Requirements  \u2014  one row per requirement sentence",
+            variable=self.mode,
+            value="requirements",
+            command=self._on_mode_change,
+        ).pack(anchor="w")
+        ttk.Radiobutton(
+            row,
+            text="Actors  \u2014  canonical actors list (feeds --actors)",
+            variable=self.mode,
+            value="actors",
+            command=self._on_mode_change,
+        ).pack(anchor="w")
 
     # --- section: input files --- #
 
@@ -217,12 +256,13 @@ class ExtractorApp:
             parent, text="6. Statement-set CSV (optional \u2014 paired-level hierarchy)"
         )
         frame.pack(fill="x", **pad)
-        ttk.Checkbutton(
+        self.ss_checkbox = ttk.Checkbutton(
             frame,
-            text="Also export to statement-set CSV",
+            text="Also export to statement-set CSV (requirements mode only)",
             variable=self.export_statement_set,
             command=self._toggle_statement_set,
-        ).pack(anchor="w", padx=4, pady=(4, 0))
+        )
+        self.ss_checkbox.pack(anchor="w", padx=4, pady=(4, 0))
         row = ttk.Frame(frame)
         row.pack(fill="x", padx=4, pady=4)
         initial_state = "normal" if self.export_statement_set.get() else "disabled"
@@ -243,7 +283,8 @@ class ExtractorApp:
     def _build_run_section(self, parent: ttk.Frame, pad: dict) -> None:
         run_row = ttk.Frame(parent)
         run_row.pack(fill="x", **pad)
-        self.run_btn = ttk.Button(run_row, text="Run extraction", command=self._run)
+        # One Run button; its behaviour depends on the selected mode.
+        self.run_btn = ttk.Button(run_row, text="Run", command=self._run)
         self.run_btn.pack(side="left")
         self.cancel_btn = ttk.Button(
             run_row, text="Cancel", command=self._cancel, state="disabled"
@@ -402,7 +443,7 @@ class ExtractorApp:
             title="Save output as",
             defaultextension=".xlsx",
             filetypes=[("Excel files", "*.xlsx")],
-            initialfile="requirements.xlsx",
+            initialfile=_default_output_name(self.mode.get()),
         )
         if f:
             self.output_file.set(f)
@@ -418,9 +459,37 @@ class ExtractorApp:
             self.statement_set_file.set(f)
 
     def _toggle_statement_set(self) -> None:
-        state = "normal" if self.export_statement_set.get() else "disabled"
+        """Enable the statement-set path widgets only if the checkbox
+        is ticked AND we're in requirements mode."""
+        enabled = (
+            self.export_statement_set.get() and self.mode.get() == "requirements"
+        )
+        state = "normal" if enabled else "disabled"
         self.ss_entry.config(state=state)
         self.ss_browse_btn.config(state=state)
+
+    def _on_mode_change(self) -> None:
+        """React to a mode radio change.
+
+        * Disables the statement-set section in actors mode (it's
+          requirements-only).
+        * Swaps the default output file name when the current output
+          still matches the other mode's default (no stomp on
+          user-customised paths).
+        """
+        mode = self.mode.get()
+        # Statement-set section: only meaningful in requirements mode.
+        self._toggle_statement_set()
+        if hasattr(self, "ss_checkbox"):
+            self.ss_checkbox.config(
+                state="normal" if mode == "requirements" else "disabled"
+            )
+        # Swap default output name if the user hasn't picked a custom path.
+        current = self.output_file.get().strip()
+        current_name = Path(current).name if current else ""
+        if current_name in _DEFAULT_OUTPUT_NAMES:
+            parent = Path(current).parent if current else Path.cwd()
+            self.output_file.set(str(parent / _default_output_name(mode)))
 
     def _log(self, msg: str) -> None:
         self.log.insert(END, msg + "\n")
@@ -432,8 +501,12 @@ class ExtractorApp:
     # ----------------------------------------------------------------- #
 
     def _run(self) -> None:
+        """Mode-aware dispatcher: runs requirements or actor-scan."""
         if self._worker is not None and self._worker.is_alive():
             return  # already running — no-op
+        if self.mode.get() == "actors":
+            self._run_actors_scan()
+            return
         if not self.input_files:
             messagebox.showwarning("No inputs", "Please add at least one .docx file.")
             return
@@ -529,6 +602,80 @@ class ExtractorApp:
         self.status_var.set(status)
         self._last_output_path = output_path
 
+    # ----------------------------------------------------------------- #
+    # Actor-only scan
+    # ----------------------------------------------------------------- #
+
+    def _run_actors_scan(self) -> None:
+        """Scan inputs for actors and write an Actor/Aliases .xlsx.
+
+        Called from :meth:`_run` when mode == "actors".  The Run-section
+        output field doubles as the destination path in actors mode, so
+        we don't pop an extra file-picker here anymore — the user picks
+        the path once via the normal "5. Output" browse button.
+        """
+        if not self.input_files:
+            messagebox.showwarning("No inputs", "Please add at least one .docx file.")
+            return
+        out_raw = self.output_file.get().strip()
+        if not out_raw:
+            messagebox.showwarning("No output", "Please choose an output .xlsx path.")
+            return
+        out_path = Path(out_raw)
+
+        actors_path = self.actors_file.get().strip()
+        seed = Path(actors_path) if actors_path else None
+
+        config_raw = self.config_file.get().strip()
+        config = Path(config_raw) if config_raw else None
+
+        self.input_files = dedupe_paths(self.input_files)
+        inputs_snapshot = list(self.input_files)
+
+        self._cancel_event.clear()
+        self.run_btn.config(state="disabled")
+        self.cancel_btn.config(state="normal")
+        self.status_var.set("Scanning actors\u2026")
+        self.log.delete("1.0", END)
+        self.progress.config(value=0, maximum=max(1, len(inputs_snapshot)))
+
+        def worker() -> None:
+            try:
+                result = scan_actors_from_files(
+                    input_paths=inputs_snapshot,
+                    output_path=out_path,
+                    seed_actors_xlsx=seed,
+                    use_nlp=self.use_nlp.get(),
+                    config_path=config,
+                    progress=lambda m: self.root.after(0, self._log, m),
+                    file_progress=lambda i, n, name: self.root.after(
+                        0, self._on_file_progress, i, n, name
+                    ),
+                    cancel_check=self._cancel_event.is_set,
+                )
+            except ActorScanCancelled as e:
+                self.root.after(0, self._log, f"Cancelled: {e}")
+                self.root.after(0, self._finish_run, "Cancelled.", None)
+                return
+            except Exception as e:  # noqa: BLE001
+                self.root.after(0, self._log, f"ERROR: {e}")
+                self.root.after(0, self._finish_run, "Error.", None)
+                self.root.after(0, messagebox.showerror, "Error", str(e))
+                return
+
+            msg = (
+                f"Done. {result.stats.groups} actor group(s) from "
+                f"{result.stats.observations} observation(s).\n"
+                f"Output: {result.output_path}"
+            )
+            self.root.after(0, self._log, "")
+            self.root.after(0, self._log, msg)
+            self.root.after(0, self._finish_run, "Done.", result.output_path)
+            self.root.after(0, self._show_done_dialog, msg, result.output_path)
+
+        self._worker = threading.Thread(target=worker, daemon=True)
+        self._worker.start()
+
     def _show_done_dialog(self, msg: str, output_path: Optional[Path]) -> None:
         """REVIEW §3.5: offer an Open-output-file action on success."""
         if output_path is not None and self.open_output_on_done.get():
@@ -560,6 +707,7 @@ class ExtractorApp:
         self.settings.use_nlp = bool(self.use_nlp.get())
         self.settings.export_statement_set = bool(self.export_statement_set.get())
         self.settings.open_output_on_done = bool(self.open_output_on_done.get())
+        self.settings.mode = self.mode.get()
         self.settings.remember_inputs(self.input_files)
         return self.settings
 

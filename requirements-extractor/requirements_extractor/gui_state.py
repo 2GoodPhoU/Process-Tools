@@ -27,6 +27,10 @@ from typing import Any, Dict, Iterable, List, Optional
 # ---------------------------------------------------------------------------
 
 
+#: Extraction modes the GUI knows how to run.  Mirrors the CLI.
+_VALID_MODES = frozenset({"requirements", "actors"})
+
+
 def default_settings_path() -> Path:
     """Return the per-user settings file location.
 
@@ -65,6 +69,11 @@ class GuiSettings:
     use_nlp: bool = False
     export_statement_set: bool = False
     open_output_on_done: bool = True  # default to opening — it's the common case
+
+    # Extraction mode the user last chose in the GUI.  Mirrors the CLI
+    # subcommand names so the two surfaces stay in lockstep.  Unknown
+    # values coming off disk collapse to "requirements".
+    mode: str = "requirements"
 
     # Recently used docx inputs, most-recent-first.  Capped in _trim_recent.
     recent_inputs: List[str] = field(default_factory=list)
@@ -114,7 +123,13 @@ class GuiSettings:
                 if not isinstance(value, list):
                     continue
             kwargs[name] = value
-        return cls(**kwargs)
+        inst = cls(**kwargs)
+        # Guard: mode must be one of the CLI subcommand names.  A value
+        # left over from a future release (or hand-edited) shouldn't
+        # wedge the GUI — fall back to the default instead.
+        if inst.mode not in _VALID_MODES:
+            inst.mode = "requirements"
+        return inst
 
     # --- Persistence ----------------------------------------------------- #
 

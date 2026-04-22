@@ -1,4 +1,13 @@
-# Requirements Extractor — review & improvement suggestions
+# Document Data Extractor — review & improvement suggestions
+
+> Note: this tool was originally named "Requirements Extractor".  The
+> user-facing surface (CLI command name, GUI window title, packaging
+> artifacts, README branding) has since been rebranded to
+> **Document Data Extractor** to reflect the addition of actors mode,
+> but the Python package is still `requirements_extractor` internally
+> so existing imports and scripts keep working.  References below to
+> "Requirements Extractor" in commit-history context are preserved
+> verbatim.
 
 A pass through the current codebase (`requirements_extractor/*.py`, `packaging/`, CLI and GUI entry points) and the sample output. Findings are grouped by priority. Each item cites the file and line range so it's easy to jump to.
 
@@ -22,12 +31,14 @@ The **Today, small** batch plus a **configurable file-format parser** have been 
 - §2.6 (`_MAX_LEVEL = 4` is misleading) — ✅ FIXED. Renamed to `_HEADER_LEVEL_PAIRS` with a docstring note that only L1–L3 are functionally populated.
 - §2.10 (GUI cannot be cancelled mid-run) — ✅ FIXED. ``extract_from_files`` now accepts a ``cancel_check`` callback and ``file_progress(i, n, name)`` callback. GUI has a **Cancel** button that sets a ``threading.Event`` which the extractor polls between files; a cancel before any write raises ``ExtractionCancelled`` and no half-written output lands on disk. Covered by ``TestCancelCheck`` (3 tests) and ``TestFileProgress`` (1 test) in ``tests/test_extractor_cancel.py``.
 - §2.11 (duplicate-file detection uses identity, not resolved path) — ✅ FIXED. All dedup goes through ``gui_state.dedupe_paths`` / ``is_duplicate_of_any``, which normalise with ``Path.resolve()`` so ``./a/../a/spec.docx`` and ``a/spec.docx`` collapse. A final dedup pass runs just before Run, catching any entries that slipped in via drag-and-drop. Covered by ``TestPathDedup`` in ``tests/test_gui_state.py``.
-- §2.12 (no tests) — ✅ PARTIALLY FIXED. `tests/` now ships with 126 unit/integration tests across `test_detector.py`, `test_config.py`, `test_parser.py`, `test_edge_cases.py`, `test_gui_state.py`, and `test_extractor_cancel.py`. Run with `python -m unittest discover tests`. Pytest not required.
+- §2.12 (no tests) — ✅ PARTIALLY FIXED. `tests/` now ships with 174 unit/integration tests across `test_detector.py`, `test_config.py`, `test_parser.py`, `test_edge_cases.py`, `test_gui_state.py`, `test_extractor_cancel.py`, `test_actor_scan.py`, and `test_cli.py`. Run with `python -m unittest discover tests`. Pytest not required.
 - §3.4 (progress bar in GUI) — ✅ FIXED. ``ttk.Progressbar`` in determinate mode, advanced per-file via the new ``file_progress`` extractor callback.
 - §3.5 (open output file from the "done" dialog) — ✅ FIXED. Default is now 'open on success' (toggleable via a checkbox in §4 Options); when disabled the completion dialog offers a yes/no prompt. Cross-platform open via ``os.startfile`` / ``open`` / ``xdg-open``.
 - §3.6 (persistent settings) — ✅ FIXED. ``gui_state.GuiSettings`` dataclass round-trips to ``~/.requirements_extractor/settings.json`` on window close and reloads on launch. Defensive against missing / malformed / future-schema files — always launches cleanly. Covered by ``TestGuiSettingsRoundtrip`` (6 tests).
 - §3.7 (drag-and-drop inputs) — ✅ FIXED. Optional ``tkinterdnd2`` dependency enables drag-and-drop onto the input list; absent, the UI falls back to the existing buttons without warning. Added to ``requirements-optional.txt``.
 - §3.14 (GUI "Open actors template" button) — ✅ FIXED. New **Save template…** button in the Actors section calls ``gui_state.write_actors_template`` which emits a ready-to-fill .xlsx (with a Readme sheet) using the exact "Actor" / "Aliases" headers that ``load_actors_from_xlsx`` expects. Covered by ``TestActorsTemplate`` (round-trip test confirms the template parses back without error).
+- **Actor-only scan mode** (new capability, complements §1.7 in practice) — ✅ FIXED. A dedicated ``actors`` / ``scan`` CLI subcommand and an **Actors** mode in the GUI run the parser without keyword detection and emit a three-sheet workbook (Actors / Observations / Readme). The Actors sheet's header shape (``Actor`` / ``Aliases``) is directly consumable by ``--actors`` on a subsequent run, so users can bootstrap and iterate on an actors list cheaply. Seeded re-scans preserve canonical spellings verbatim and add only new variants as aliases. Covered by ``tests/test_actor_scan.py`` (23 tests: normalisation, grouping seeded/unseeded, end-to-end round-trip through ``load_actors_from_xlsx``, cancel/progress plumbing).
+- **Subcommand CLI + surface rename to `document-data-extractor`** — ✅ FIXED. The tool now presents as ``document-data-extractor`` (window title, packaging spec, README branding) to reflect that it does more than just requirements.  The CLI is git-style: ``document-data-extractor requirements SPECS/`` and ``document-data-extractor actors SPECS/`` (with ``reqs`` / ``scan`` aliases).  Global flags (``--config``, ``-q/--quiet``, ``--no-summary``) live on the root parser.  The legacy ``extract.py`` shim transparently rewrites flag-style argv to a ``requirements`` subcommand so older scripts keep working.  GUI exposes the mode as a top-of-window radio selector; the statement-set section greys out in actors mode; the chosen mode is persisted in ``GuiSettings`` and restored on next launch.  The Python package remains ``requirements_extractor`` internally so existing imports don't break.  Covered by ``tests/test_cli.py`` (23 tests: parser shape, per-subcommand flag parsing, alias passthrough, end-to-end dispatch, shim argv rewriting) plus ``TestGuiSettingsMode`` in ``tests/test_gui_state.py``.
 
 Still open (carried into the roadmap below): §1.3, §1.6, §1.7, §1.9, §1.10, §2.4, §2.7, §2.8, §2.9, §2.13, §2.14, §3.1, §3.2 (beyond keyword tuning), §3.3, §3.8, §3.9, §3.10, §3.11, §3.12, §3.13, §3.15.
 
@@ -130,7 +141,7 @@ Add a `tests/` folder, one `pytest.ini`, and a 20-line GitHub Action to run it.
 All output is raw `print`. Switch the progress callback internals to `logging.getLogger("requirements_extractor")` so users can dial verbosity without changing the public API.
 
 ### 2.14 PyInstaller spec's pydantic hazard — LOW
-`packaging/RequirementsExtractor.spec:56-57` bundles both `pydantic` and `pydantic_core`. spaCy's version pin has flipped between pydantic v1 and v2 across minor releases — bundling the wrong pair causes runtime `ValidationError`s that only surface on the target machine. Suggest pinning `spacy`, `pydantic`, and `pydantic-core` in a `packaging/build-requirements.txt` stack and calling them out in the build instructions.
+`packaging/DocumentDataExtractor.spec` bundles both `pydantic` and `pydantic_core`. spaCy's version pin has flipped between pydantic v1 and v2 across minor releases — bundling the wrong pair causes runtime `ValidationError`s that only surface on the target machine. Suggest pinning `spacy`, `pydantic`, and `pydantic-core` in a `packaging/build-requirements.txt` stack and calling them out in the build instructions.
 
 ---
 

@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Build a RequirementsExtractor binary on macOS or Linux.
+# Build a DocumentDataExtractor binary on macOS or Linux.
 #
 # Usage:
 #     ./packaging/build.sh
 #
-# On macOS this produces dist/RequirementsExtractor.app and a matching
-# standalone binary at dist/RequirementsExtractor.  On Linux you just get
+# On macOS this produces dist/DocumentDataExtractor.app and a matching
+# standalone binary at dist/DocumentDataExtractor.  On Linux you just get
 # the binary.  Cross-building to Windows from these platforms is not
 # supported — run packaging\build.bat on a Windows machine for a .exe.
 
@@ -16,7 +16,7 @@ echo "=== Cleaning previous build artifacts ==="
 rm -rf build dist
 
 echo "=== Running PyInstaller ==="
-pyinstaller packaging/RequirementsExtractor.spec --clean --noconfirm
+pyinstaller packaging/DocumentDataExtractor.spec --clean --noconfirm
 
 echo
 echo "=== Build complete ==="
