@@ -76,9 +76,26 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--config",
+        type=Path,
+        default=None,
+        help=(
+            "Path to a YAML config that hints at the document format "
+            "(section prefixes, tables to skip, keyword tuning, content "
+            "filters). See samples/sample_config.yaml for the full schema. "
+            "A per-doc '<stem>.reqx.yaml' next to any .docx is auto-loaded "
+            "and overrides the per-run config for that file."
+        ),
+    )
+    parser.add_argument(
         "-q", "--quiet",
         action="store_true",
-        help="Suppress progress output.",
+        help="Suppress per-file progress output.  The final summary still prints.",
+    )
+    parser.add_argument(
+        "--no-summary",
+        action="store_true",
+        help="Also suppress the final summary block (useful for scripted runs).",
     )
     return parser
 
@@ -91,8 +108,12 @@ def main(argv: List[str] | None = None) -> int:
         print("No .docx files found.", file=sys.stderr)
         return 2
 
-    def log(msg: str) -> None:
+    def progress(msg: str) -> None:
         if not args.quiet:
+            print(msg)
+
+    def summary(msg: str) -> None:
+        if not args.no_summary:
             print(msg)
 
     result = extract_from_files(
@@ -101,22 +122,23 @@ def main(argv: List[str] | None = None) -> int:
         actors_xlsx=args.actors,
         use_nlp=args.nlp,
         statement_set_path=args.statement_set,
-        progress=log,
+        config_path=args.config,
+        progress=progress,
     )
 
-    log("")
-    log("==== Summary ====")
-    log(f"Files processed:      {result.stats.files_processed}")
-    log(f"Requirements found:   {result.stats.requirements_found}")
-    log(f"  Hard:               {result.stats.hard_count}")
-    log(f"  Soft (needs review):{result.stats.soft_count}")
+    summary("")
+    summary("==== Summary ====")
+    summary(f"Files processed:      {result.stats.files_processed}")
+    summary(f"Requirements found:   {result.stats.requirements_found}")
+    summary(f"  Hard:               {result.stats.hard_count}")
+    summary(f"  Soft (needs review):{result.stats.soft_count}")
     if result.stats.errors:
-        log(f"Warnings/Errors:      {len(result.stats.errors)}")
+        summary(f"Warnings/Errors:      {len(result.stats.errors)}")
         for err in result.stats.errors:
-            log(f"  - {err}")
-    log(f"Output:               {result.output_path}")
+            summary(f"  - {err}")
+    summary(f"Output:               {result.output_path}")
     if result.statement_set_path is not None:
-        log(f"Statement-set CSV:    {result.statement_set_path}")
+        summary(f"Statement-set CSV:    {result.statement_set_path}")
     return 0
 
 

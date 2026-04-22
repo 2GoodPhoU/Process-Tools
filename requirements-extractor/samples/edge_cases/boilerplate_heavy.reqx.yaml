@@ -1,0 +1,13 @@
+version: 1
+skip_sections:
+  titles:
+    - Revision History
+    - Table of Contents
+    - Glossary
+    - References
+    # Each boilerplate table uses its title as the first cell, so
+    # these matches are enough to suppress the entire table's rows.
+    - v1.0
+    - v1.1
+    - RBAC
+    - ISO-27001

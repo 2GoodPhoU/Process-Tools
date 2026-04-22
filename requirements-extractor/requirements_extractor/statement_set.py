@@ -19,8 +19,14 @@ Only headings, section rows, and requirements produce output rows.
 
 The writer emits a fixed-width header that matches the provided example
 (Level 1..Level 4 + a final "Level #" placeholder), so the exported CSV
-drops into the same template.  If you ever see requirements nested more
-than three levels deep, bump `_MAX_LEVEL` below.
+drops into the same template.
+
+NOTE: the hierarchy actually emitted only uses Level 1, 2, and 3.
+`_HEADER_LEVEL_PAIRS` below only controls how many (Level N, Description N)
+header column pairs are written to match the template's width — bumping it
+pads the header but does NOT add functional nesting.  If you need deeper
+nesting, you also need to teach `events_to_rows` to emit at those levels
+(e.g. map H2/H3 doc headings to L2/L3 and push table-derived items deeper).
 """
 
 from __future__ import annotations
@@ -36,21 +42,23 @@ from .models import (
 )
 
 
-# Pair count for concrete levels (L1..L4).  A final "Level #, Description #"
-# pair is always appended to match the provided example header exactly.
-_MAX_LEVEL = 4
+# Header-only level pair count.  Controls how many (Level N, Description N)
+# column pairs are emitted in the header row to match the template's width.
+# A final "Level #, Description #" placeholder pair is always appended after.
+# NOTE: this is cosmetic — _place() is only called with levels 1, 2, and 3.
+_HEADER_LEVEL_PAIRS = 4
 
 
 def _header_row() -> List[str]:
     cols: List[str] = []
-    for i in range(1, _MAX_LEVEL + 1):
+    for i in range(1, _HEADER_LEVEL_PAIRS + 1):
         cols += [f"Level {i}", f"Description {i}"]
     cols += ["Level #", "Description #"]
     return cols
 
 
 def _blank_row() -> List[str]:
-    return [""] * ((_MAX_LEVEL + 1) * 2)
+    return [""] * ((_HEADER_LEVEL_PAIRS + 1) * 2)
 
 
 def _place(row: List[str], level: int, title: str, description: str) -> None:

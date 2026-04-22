@@ -22,6 +22,7 @@ COLUMNS = [
     ("Secondary Actors", 26),
     ("Requirement", 70),
     ("Type", 8),
+    ("Polarity", 10),
     ("Keywords", 20),
     ("Confidence", 12),
     ("Notes", 36),
@@ -31,6 +32,9 @@ HEADER_FILL = PatternFill("solid", start_color="1F3864")
 HEADER_FONT = Font(name="Arial", bold=True, color="FFFFFF", size=11)
 BODY_FONT = Font(name="Arial", size=10)
 SOFT_FILL = PatternFill("solid", start_color="FFF2CC")  # light yellow
+# Negative requirements (shall-not etc.) get a tinted background so they
+# stand out during review.  Subtle so the Soft highlight still dominates.
+NEGATIVE_FILL = PatternFill("solid", start_color="F4CCCC")  # light red
 
 
 def write_requirements(
@@ -67,16 +71,25 @@ def write_requirements(
             req.secondary_actors_str,
             req.text,
             req.req_type,
+            req.polarity,
             req.keywords_str,
             req.confidence,
             req.notes,
         ]
+        # Pick a row fill: Negative polarity beats Soft, since flagging
+        # "shall not / must not" language for a reviewer matters more than
+        # the advisory-vs-binding distinction.
+        row_fill = None
+        if req.polarity == "Negative":
+            row_fill = NEGATIVE_FILL
+        elif req.req_type == "Soft":
+            row_fill = SOFT_FILL
         for col_idx, value in enumerate(values, start=1):
             cell = ws.cell(row=row_idx, column=col_idx, value=value)
             cell.font = BODY_FONT
             cell.alignment = Alignment(wrap_text=True, vertical="top")
-            if req.req_type == "Soft":
-                cell.fill = SOFT_FILL
+            if row_fill is not None:
+                cell.fill = row_fill
 
     # Autofilter across the populated range
     if requirements:

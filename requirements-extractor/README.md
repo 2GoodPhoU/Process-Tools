@@ -1,6 +1,6 @@
 # Requirements Extractor
 
-A small Python tool that reads one or more Word documents (`.docx`) and pulls out anything that looks like a requirement — shall/must/will/required statements (plus softer should/may/can items flagged for human review) — into a single tidy Excel workbook.
+A small Python tool that reads one or more Word documents (`.docx`) and pulls out anything that looks like a requirement — shall/must/required statements (plus softer should/may/can/will items flagged for human review) — into a single tidy Excel workbook. It also flags **negative requirements** ("shall not", "must not", "can't") so prohibitions don't get lost in a long list of obligations.
 
 Each row in the output workbook is one requirement, with columns for traceability (file, section, table/row), the primary actor (from the first column of the 2-column table), any secondary actors referenced in the text, the requirement itself, and the matched keywords.
 
@@ -76,7 +76,7 @@ With the venv active:
 pip install -r requirements.txt
 ```
 
-That installs `python-docx` (for reading Word files) and `openpyxl` (for writing Excel files).
+That installs `python-docx` (for reading Word files), `openpyxl` (for writing Excel files), and `PyYAML` (for optional config files).
 
 ### 6. (Optional) Install the NLP add-on
 
@@ -99,7 +99,13 @@ From the `requirements-extractor/` folder, with the venv active:
 python run_gui.py
 ```
 
-A window opens. Add one or more `.docx` files (or a whole folder), optionally point at an actors list, choose where to save the output, and click **Run extraction**. Progress shows in the log area; when it's done you'll see a summary dialog.
+A window opens. Add one or more `.docx` files (or a whole folder), optionally point at an actors list, choose where to save the output, and click **Run extraction**. A determinate progress bar tracks the per-file progress and a **Cancel** button can stop the run between files. When it finishes, the output file opens automatically (disable via the "Open output file when the run finishes" checkbox).
+
+**Bonus conveniences:**
+
+- **Drag-and-drop** — drop `.docx` files or folders directly onto the input list. Requires `pip install tkinterdnd2` (optional — the UI degrades to buttons if it isn't installed).
+- **Save actors template\u2026** — click this button in the Actors section to generate a ready-to-fill `actors_template.xlsx` instead of hand-rolling one.
+- **Remembered settings** — window size, last-used paths, and checkbox states are persisted to `~/.requirements_extractor/settings.json` and restored next launch.
 
 > Tip for Windows users: rename `run_gui.py` to `run_gui.pyw` to suppress the background console window when you double-click.
 
@@ -148,6 +154,72 @@ Pass it with `--actors actors.xlsx` (CLI) or via the "Actors list" field in the 
 
 ---
 
+## Config file (optional) — hint at the document format
+
+The extractor makes reasonable guesses by default (2-column tables, numeric section prefixes, a fixed keyword list). A YAML config file lets you tailor those guesses per project or per document when the defaults grab garbage. Nothing is mandatory — every field falls back to a built-in default if omitted.
+
+### How configs are loaded
+
+There are two loading modes and they stack:
+
+1. **Per-run** — one config applies to the whole batch.
+   - CLI: `python extract.py spec.docx -o out.xlsx --config my.yaml`
+   - GUI: "Config file" field (section 3).
+2. **Per-document** — automatic. Drop a file named `<docstem>.reqx.yaml` (or `.reqx.yml`) next to a `.docx` and the tool picks it up for just that file.
+   ```
+   specs/
+     payload.docx
+     payload.reqx.yaml    ← auto-loaded when payload.docx is processed
+     flight.docx
+   ```
+
+When both exist, the per-doc config overrides the per-run config key-by-key. Mappings merge; lists and scalars replace wholesale. (So a per-doc `skip_sections.titles: [Glossary]` *replaces* the per-run list — it does not append.)
+
+### Supported keys
+
+See `samples/sample_config.yaml` for a fully commented example. At a glance:
+
+```yaml
+version: 1
+
+skip_sections:
+  titles: [Revision History, References, Glossary]
+  table_indices: [1]          # 1-based
+
+tables:
+  actor_column:   1
+  content_column: 2
+  min_columns:    2
+  max_columns:    2
+  section_prefix: '^\s*(?:[A-Z]{1,4}[-.]?)?\d+(?:\.\d+)*[.)]?\s+\S'
+
+keywords:
+  hard_add:    [is responsible for]
+  hard_remove: [will]         # drop noisy future-tense matches
+  soft_add:    []
+  soft_remove: []
+
+content:
+  skip_if_starts_with: ["Note:", "Example:", "See also:"]
+  skip_pattern: null          # optional regex; matches -> drop
+  require_primary_actor: false
+
+parser:
+  recursive: true             # walk nested tables of arbitrary depth
+```
+
+What each section does:
+
+- **skip_sections** — drop whole rows (by first-column text match) or whole tables (by 1-based index) before parsing.
+- **tables** — where the actor and content columns live, what counts as a requirements table, and the regex that flags a section-header row. The default `section_prefix` handles numeric (`3.1`), dotted (`3.1.2`), and alphanumeric (`SR-1.2`, `A.1`, `REQ-042`) schemes.
+- **keywords** — add house terms (multi-word phrases are fine) or remove built-ins that misfire. `will` is SOFT by default (future-tense prose trips it easily, so matches are yellow-highlighted for review rather than treated as binding). If your house style treats "will" as equivalent to "shall", use `keywords: {hard_add: [will], soft_remove: [will]}`; if you want "will" ignored entirely, use `keywords: {soft_remove: [will]}`.
+- **content** — drop candidate sentences by leading text, by regex, or when no primary actor is available.
+- **parser.recursive** — when `true` (default) the walker descends into nested tables of any depth and emits dotted block refs. Flip to `false` for the legacy one-level-deep behaviour.
+
+Unknown keys are rejected up front with a clear error message so typos don't silently do nothing.
+
+---
+
 ## Statement-set CSV (optional second output)
 
 The Excel workbook is the primary output, but the tool can *also* export the extracted content to a "statement set" CSV matching a specific paired-column template (`Level 1, Description 1, Level 2, Description 2, …`). Each row fills exactly one `(Level N, Description N)` pair and leaves the others blank, so the file opens as a pre-order-flattened hierarchy:
@@ -189,13 +261,14 @@ Two sheets:
 | Secondary Actors | Other known actors mentioned in the requirement text.                                       |
 | Requirement      | The requirement sentence or item.                                                           |
 | Type             | `Hard` (binding keywords) or `Soft` (advisory — yellow-highlighted).                        |
+| Polarity         | `Positive` or `Negative` — whether a modal keyword is immediately negated ("shall not", "must not", "may never", "can't"). Negative rows are shaded light red and win over the Soft yellow so prohibitions stand out during review. |
 | Keywords         | Which trigger words matched.                                                                |
 | Confidence       | High / Medium / Low — a rough heuristic, not a guarantee.                                   |
 | Notes            | Flags for the reviewer (e.g. "verify soft language").                                       |
 
 **Summary** — quick totals and a breakdown by primary actor.
 
-The header row is frozen, autofilters are enabled, and soft rows are shaded yellow so they're easy to batch-review.
+The header row is frozen, autofilters are enabled, soft rows are shaded yellow, and negative (prohibition) rows are shaded light red so both categories are easy to batch-review. A negative-polarity soft row is still shown red — prohibitions take priority because missing one is higher-risk than missing an advisory.
 
 ---
 
@@ -256,9 +329,12 @@ Just re-run `packaging\build.bat`. It cleans the previous `build/` and `dist/` f
 
 ## Tuning
 
-- **Keyword lists** live in `requirements_extractor/detector.py` (`HARD_KEYWORDS`, `SOFT_KEYWORDS`). Add your org's house terms.
+Most tuning should happen through a **config file** (see the "Config file" section above) so you don't have to edit source. When that's not enough:
+
+- **Default keyword lists** live in `requirements_extractor/detector.py` (`HARD_KEYWORDS`, `SOFT_KEYWORDS`). Config `keywords.hard_add`/`hard_remove` are layered on top of these.
 - **Confidence heuristic** is in the same file — it's intentionally simple and meant to be edited.
 - **Output columns / formatting** live in `requirements_extractor/writer.py`.
+- **Config schema** lives in `requirements_extractor/config.py` — add a new key there if you need one that isn't already supported.
 
 ---
 

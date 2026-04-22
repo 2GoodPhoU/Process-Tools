@@ -1,0 +1,11 @@
+version: 1
+keywords:
+  # 'will' lives in SOFT under current defaults; soft_remove drops it
+  # entirely so future-tense prose doesn't register at all for this spec.
+  soft_remove: [will]
+content:
+  skip_if_starts_with:
+    - "Note:"
+    - "Example:"
+    - "Caution:"
+  skip_pattern: '\bTBD\b'

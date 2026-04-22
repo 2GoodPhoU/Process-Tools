@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List
 
 
 @dataclass
@@ -23,19 +23,7 @@ class Requirement:
     keywords: List[str]                 # keywords that matched
     confidence: str                     # "High" | "Medium" | "Low"
     notes: str = ""                     # free-text flags for reviewers
-
-    @property
-    def source(self) -> str:
-        """Human-readable source path for the Excel 'Source' column."""
-        parts = [self.source_file]
-        if self.heading_trail:
-            parts.append(self.heading_trail)
-        if self.section_topic:
-            parts.append(self.section_topic)
-        parts.append(self.row_ref)
-        if self.block_ref:
-            parts.append(self.block_ref)
-        return " > ".join(p for p in parts if p)
+    polarity: str = "Positive"          # "Positive" | "Negative" (shall-not etc.)
 
     @property
     def secondary_actors_str(self) -> str:

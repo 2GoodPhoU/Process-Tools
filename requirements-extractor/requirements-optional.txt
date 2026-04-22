@@ -4,3 +4,8 @@
 # After installing, also download the English model:
 #     python -m spacy download en_core_web_sm
 spacy>=3.7.0
+
+# Optional — GUI drag-and-drop for .docx files and folders.
+# Without this the GUI still works, you just have to use the
+# "Add file(s)…" / "Add folder…" buttons.
+tkinterdnd2>=0.3.0

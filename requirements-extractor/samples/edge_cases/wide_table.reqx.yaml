@@ -1,0 +1,9 @@
+version: 1
+tables:
+  actor_column: 2
+  content_column: 3
+  min_columns: 4
+  max_columns: 4
+# NB: the bare nouns 'requirement' / 'requirements' are no longer in the
+# default HARD set (they never produced useful matches), so no keyword
+# remove is needed here for header rows to be ignored.
