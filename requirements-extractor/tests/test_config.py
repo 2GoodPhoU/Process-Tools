@@ -284,6 +284,40 @@ class TestTablesConfig(unittest.TestCase):
         self.assertTrue(r.match("REQ-042 Requirement"))
         self.assertFalse(r.match("Introduction"))
 
+    def test_section_re_matches_letter_suffix(self) -> None:
+        """§1.5: IEEE/ISO subdivisions like ``5.1.1a`` must be treated as
+        sections, not as actor rows with a stray letter."""
+        from requirements_extractor.config import TablesConfig
+        r = TablesConfig().section_re()
+        self.assertTrue(r.match("5.1.1a Variant"))
+        self.assertTrue(r.match("5.1.1b Variant"))
+        self.assertTrue(r.match("3.1a) Subitem"))
+        # Still matches when a letter is absent.
+        self.assertTrue(r.match("5.1.1 Normal"))
+
+    def test_section_re_rejects_prefix_glued_to_title(self) -> None:
+        """A section prefix must be followed by whitespace — ``3.1abc xyz``
+        looks like a typo, not a real prefix, and must not match."""
+        from requirements_extractor.config import TablesConfig
+        r = TablesConfig().section_re()
+        self.assertFalse(r.match("3.1abc xyz"))
+        self.assertFalse(r.match("3.1Title"))
+
+    def test_section_re_rejects_unstructured_titles(self) -> None:
+        """Plain prose headings must not match (they'd collide with actor
+        rows in the 2-column table)."""
+        from requirements_extractor.config import TablesConfig
+        r = TablesConfig().section_re()
+        self.assertFalse(r.match("Section 1 heading"))
+        self.assertFalse(r.match("IV. Roman numeral heading"))
+        self.assertFalse(r.match("Introduction"))
+
+    def test_section_re_paren_style(self) -> None:
+        from requirements_extractor.config import TablesConfig
+        r = TablesConfig().section_re()
+        self.assertTrue(r.match("1) Paren style"))
+        self.assertTrue(r.match("3.1) Also paren"))
+
 
 if __name__ == "__main__":
     unittest.main()

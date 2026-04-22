@@ -69,6 +69,10 @@ class GuiSettings:
     use_nlp: bool = False
     export_statement_set: bool = False
     open_output_on_done: bool = True  # default to opening — it's the common case
+    # Dry-run mirrors the CLI's ``--dry-run`` flag: parse + detect + assign
+    # stable IDs, but skip writing any files.  Persisted off by default so
+    # a forgetful user doesn't silently disable output across restarts.
+    dry_run: bool = False
 
     # Extraction mode the user last chose in the GUI.  Mirrors the CLI
     # subcommand names so the two surfaces stay in lockstep.  Unknown

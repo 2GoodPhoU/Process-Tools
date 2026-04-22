@@ -348,6 +348,8 @@ python extract.py requirements spec.docx --dry-run --show-samples 5
 
 Use it when you're iterating on a YAML config, evaluating a new corpus, or just want to know how many requirements a new file will produce before you overwrite a previous result.
 
+The GUI surfaces the same behaviour as a **Dry run — parse & count but don't write any files** checkbox in section 4 (Options). When ticked, the Run button still parses and reports counts in the log/done dialog, but no files are written and the auto-open-on-done step is skipped.
+
 ---
 
 ## Packaging to a Windows .exe (optional)

@@ -44,6 +44,7 @@ class TestGuiSettingsDefaults(unittest.TestCase):
         self.assertFalse(s.use_nlp)
         self.assertFalse(s.export_statement_set)
         self.assertTrue(s.open_output_on_done)
+        self.assertFalse(s.dry_run)
         self.assertEqual(s.mode, "requirements")
         self.assertEqual(s.recent_inputs, [])
 
@@ -78,6 +79,7 @@ class TestGuiSettingsRoundtrip(unittest.TestCase):
                 use_nlp=True,
                 export_statement_set=True,
                 open_output_on_done=False,
+                dry_run=True,
                 recent_inputs=["/tmp/a.docx", "/tmp/b.docx"],
             )
             written = before.save(target)
@@ -91,6 +93,7 @@ class TestGuiSettingsRoundtrip(unittest.TestCase):
             self.assertTrue(after.use_nlp)
             self.assertTrue(after.export_statement_set)
             self.assertFalse(after.open_output_on_done)
+            self.assertTrue(after.dry_run)
             self.assertEqual(after.recent_inputs, ["/tmp/a.docx", "/tmp/b.docx"])
 
     def test_load_missing_file_returns_defaults(self) -> None:

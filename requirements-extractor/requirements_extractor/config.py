@@ -80,8 +80,26 @@ from typing import Any, Dict, List, Optional
 # ---------------------------------------------------------------------------
 
 
+# Section-prefix recogniser used to tell a "section title" row in the
+# 2-column requirements table apart from an "actor" row.  Matches:
+#
+#   Numeric:        "3.1 ...",  "3.1.2 ...",  "3. ..."
+#   Paren-style:    "1) ...",   "3.1) ..."
+#   Labelled:       "A.1 ...", "SR-1.2 ...", "REQ-042 ...", "H1.2 ..."
+#                   (1–4 uppercase letters, optional '-' or '.' separator)
+#   Letter suffix:  "5.1.1a ...", "3.1b) ..."
+#                   (single lowercase letter attached to the last digit
+#                   group — common in IEEE/ISO subdivisions)
+#
+# Intentionally does NOT match:
+#   Roman numerals ("IV. ...")          — too easily confused with words
+#   Labelled keywords ("Section 1 ...") — spelling varies too much
+#   Missing whitespace ("3.1Title")     — likely a typo, not a real prefix
+#
+# If your corpus uses one of the unmatched styles, override
+# ``tables.section_prefix`` in a per-run or per-doc YAML config.
 DEFAULT_SECTION_PREFIX = (
-    r"^\s*(?:[A-Z]{1,4}[-.]?)?\d+(?:\.\d+)*[.)]?\s+\S"
+    r"^\s*(?:[A-Z]{1,4}[-.]?)?\d+(?:\.\d+)*[a-z]?[.)]?\s+\S"
 )
 
 

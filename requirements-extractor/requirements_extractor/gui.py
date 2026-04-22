@@ -106,6 +106,10 @@ class ExtractorApp:
             or str(Path.cwd() / "requirements_statement_set.csv")
         )
         self.open_output_on_done = BooleanVar(value=self.settings.open_output_on_done)
+        # Dry-run — parse & detect but don't write any files.  GUI mirror of
+        # the CLI ``--dry-run`` flag.  Useful for previewing counts before
+        # overwriting an existing output.
+        self.dry_run = BooleanVar(value=self.settings.dry_run)
 
         # Run state ------------------------------------------------------ #
         self._cancel_event = threading.Event()
@@ -237,6 +241,14 @@ class ExtractorApp:
             frame,
             text="Open output file when the run finishes",
             variable=self.open_output_on_done,
+        ).pack(anchor="w", padx=4, pady=2)
+        ttk.Checkbutton(
+            frame,
+            text=(
+                "Dry run \u2014 parse & count but don't write any files "
+                "(requirements mode only)"
+            ),
+            variable=self.dry_run,
         ).pack(anchor="w", padx=4, pady=2)
 
     # --- section: output --- #
@@ -543,6 +555,7 @@ class ExtractorApp:
         self.progress.config(value=0, maximum=max(1, len(self.input_files)))
 
         inputs_snapshot = list(self.input_files)
+        dry_run = bool(self.dry_run.get())
 
         def worker() -> None:
             try:
@@ -558,6 +571,7 @@ class ExtractorApp:
                         0, self._on_file_progress, i, n, name
                     ),
                     cancel_check=self._cancel_event.is_set,
+                    dry_run=dry_run,
                 )
             except ExtractionCancelled as e:
                 self.root.after(0, self._log, f"Cancelled: {e}")
@@ -569,18 +583,25 @@ class ExtractorApp:
                 self.root.after(0, messagebox.showerror, "Error", str(e))
                 return
 
+            header = (
+                "Dry run complete \u2014 no files written."
+                if result.dry_run else "Done."
+            )
             msg_lines = [
-                f"Done. {result.stats.requirements_found} requirements "
+                f"{header} {result.stats.requirements_found} requirements "
                 f"({result.stats.hard_count} hard, "
                 f"{result.stats.soft_count} soft).",
-                f"Excel:        {result.output_path}",
             ]
+            if result.output_path is not None:
+                msg_lines.append(f"Excel:        {result.output_path}")
             if result.statement_set_path is not None:
                 msg_lines.append(f"Statement set: {result.statement_set_path}")
             msg = "\n".join(msg_lines)
             self.root.after(0, self._log, "")
             self.root.after(0, self._log, msg)
-            self.root.after(0, self._finish_run, "Done.", result.output_path)
+            # Status text reflects the dry-run state; no output to open/auto-open.
+            status_text = "Dry run complete." if result.dry_run else "Done."
+            self.root.after(0, self._finish_run, status_text, result.output_path)
             self.root.after(0, self._show_done_dialog, msg, result.output_path)
 
         self._worker = threading.Thread(target=worker, daemon=True)
@@ -707,6 +728,7 @@ class ExtractorApp:
         self.settings.use_nlp = bool(self.use_nlp.get())
         self.settings.export_statement_set = bool(self.export_statement_set.get())
         self.settings.open_output_on_done = bool(self.open_output_on_done.get())
+        self.settings.dry_run = bool(self.dry_run.get())
         self.settings.mode = self.mode.get()
         self.settings.remember_inputs(self.input_files)
         return self.settings

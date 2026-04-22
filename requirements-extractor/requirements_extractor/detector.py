@@ -60,11 +60,65 @@ _NEGATION_SUFFIX = r"n?[\u2019']t"
 
 
 # Sentence splitter — simple and dependency-free.  Good enough for spec prose.
+#
+# The naive rule "split on .!? followed by whitespace + capital-or-digit" is
+# great on clean prose, but spec docs routinely contain abbreviations and
+# enumerations that trip it:
+#
+#     "Dr. Smith shall approve ..."       → splits after "Dr."
+#     "The design, e.g. Fig. 3, shows..." → splits after "e.g." and "Fig."
+#     "Step 1. The user shall log in."    → splits after "Step 1."
+#
+# Rather than build a giant multi-branch lookbehind (Python's ``re`` requires
+# fixed-width lookbehinds), we split naïvely first and then merge back any
+# fragment whose tail is a known abbreviation or enumeration token.  This is
+# easy to read, easy to test, and keeps the abbreviation set in one place so
+# it can be tuned without touching the regex.
 _SENT_SPLIT_RE = re.compile(r"(?<=[\.\!\?])\s+(?=[A-Z0-9\(\"\'])")
+
+# Tokens that end in "." but are NOT sentence-final.  Matched against the
+# last whitespace-delimited token of a fragment, case-insensitively.
+_COMMON_ABBREVS: Set[str] = {
+    # Titles & name suffixes
+    "dr.", "mr.", "mrs.", "ms.", "st.", "sr.", "jr.", "prof.",
+    # Latin / inline glosses
+    "e.g.", "i.e.", "etc.", "vs.", "viz.", "cf.",
+    # Document references
+    "fig.", "eq.", "ref.", "sec.", "ch.", "no.", "vol.", "pp.", "p.",
+    # Corporate
+    "inc.", "ltd.", "corp.", "co.",
+}
+
+# Enumeration suffixes like "Step 1.", "Item 42.", "Note 7." — a short
+# CapWord (3–6 letters) followed by a number and a period.  Intentionally
+# narrow: matches the common "Step N."-style preamble without catching
+# sentence-ending ordinals like "in 2023." (no CapWord) or legit headings
+# like "Section 4." (handled elsewhere as a section prefix).
+_ENUMERATION_SUFFIX_RE = re.compile(r"\b[A-Z][a-z]{2,5}\s+\d+\.$")
+
+
+def _ends_with_abbreviation(fragment: str) -> bool:
+    """True iff ``fragment`` ends with something that shouldn't terminate
+    a sentence (a known abbreviation or an enumeration prefix)."""
+    s = fragment.rstrip()
+    if not s.endswith("."):
+        return False
+    # Compare the last whitespace-delimited token so "(e.g." and "text, e.g."
+    # both match.  Leading punctuation is stripped for the lookup.
+    last_token = s.rsplit(" ", 1)[-1].lstrip("\"'([{<").lower()
+    if last_token in _COMMON_ABBREVS:
+        return True
+    return bool(_ENUMERATION_SUFFIX_RE.search(s))
 
 
 def split_sentences(text: str) -> List[str]:
-    """Split a paragraph into sentences.  Preserves bullet-style fragments."""
+    """Split a paragraph into sentences.  Preserves bullet-style fragments.
+
+    Handles common abbreviations (``Dr.``, ``e.g.``, ``Fig.``, etc.) and
+    enumeration prefixes (``Step 1.``) by merging fragments whose tail is
+    a known non-terminal token.  See :data:`_COMMON_ABBREVS` and
+    :data:`_ENUMERATION_SUFFIX_RE` for the exact sets.
+    """
     text = (text or "").strip()
     if not text:
         return []
@@ -73,8 +127,18 @@ def split_sentences(text: str) -> List[str]:
     # a single item (common for table cells and bullet points).
     if len(text) < 400 and not re.search(r"[\.\!\?]", text):
         return [text]
-    parts = _SENT_SPLIT_RE.split(text)
-    return [p.strip() for p in parts if p.strip()]
+    raw = _SENT_SPLIT_RE.split(text)
+    parts = [p.strip() for p in raw if p.strip()]
+    # Re-glue fragments that ended at a false-positive boundary.  A merged
+    # fragment keeps its own tail for the next iteration's check, so runs
+    # of abbreviations ("See Dr. Mr. Jones.") collapse correctly.
+    merged: List[str] = []
+    for part in parts:
+        if merged and _ends_with_abbreviation(merged[-1]):
+            merged[-1] = merged[-1] + " " + part
+        else:
+            merged.append(part)
+    return merged
 
 
 # ---------------------------------------------------------------------------

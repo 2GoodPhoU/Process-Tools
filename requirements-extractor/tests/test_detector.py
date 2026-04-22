@@ -168,6 +168,79 @@ class TestSplitSentences(unittest.TestCase):
         out = split_sentences("A.  \n  B.")
         self.assertEqual(out, ["A.", "B."])
 
+    # --- Abbreviation handling (§1.3) ---------------------------------- #
+
+    def test_title_abbreviation_not_split(self) -> None:
+        out = split_sentences("Dr. Smith shall approve the design.")
+        self.assertEqual(out, ["Dr. Smith shall approve the design."])
+
+    def test_multiple_title_abbreviations_not_split(self) -> None:
+        out = split_sentences(
+            "See Dr. Jones, Mr. Brown, and Ms. Lee. They reviewed it."
+        )
+        self.assertEqual(out, [
+            "See Dr. Jones, Mr. Brown, and Ms. Lee.",
+            "They reviewed it.",
+        ])
+
+    def test_latin_abbreviation_not_split(self) -> None:
+        # "i.e." followed by a lowercase letter never split in the first
+        # place (the lookahead requires capital/digit).  The harder case
+        # is "e.g." followed by a capital — check both forms.
+        out = split_sentences(
+            "The system shall provide i.e. authentication, authorization."
+        )
+        self.assertEqual(
+            out,
+            ["The system shall provide i.e. authentication, authorization."],
+        )
+        out2 = split_sentences("See e.g. Alpha. It matters.")
+        self.assertEqual(out2, ["See e.g. Alpha.", "It matters."])
+
+    def test_reference_abbreviation_not_split(self) -> None:
+        out = split_sentences("See Fig. 3 for details. The operator may retry.")
+        self.assertEqual(out, [
+            "See Fig. 3 for details.",
+            "The operator may retry.",
+        ])
+
+    def test_enumeration_step_not_split(self) -> None:
+        out = split_sentences("Step 1. The user shall log in.")
+        self.assertEqual(out, ["Step 1. The user shall log in."])
+
+    def test_enumeration_item_not_split(self) -> None:
+        out = split_sentences("Item 42. The system shall respond.")
+        self.assertEqual(out, ["Item 42. The system shall respond."])
+
+    def test_parenthetical_abbreviation_not_split(self) -> None:
+        # "(e.g." has leading punctuation on the token — still recognised.
+        out = split_sentences(
+            "The design (e.g. Fig. 3) shows foo. The operator may retry."
+        )
+        self.assertEqual(out, [
+            "The design (e.g. Fig. 3) shows foo.",
+            "The operator may retry.",
+        ])
+
+    def test_real_sentence_still_splits_after_abbreviation(self) -> None:
+        """After merging Dr. with the following fragment, the NEXT real
+        sentence boundary must still be respected."""
+        out = split_sentences(
+            "Dr. Smith shall approve the design. Operators must comply."
+        )
+        self.assertEqual(out, [
+            "Dr. Smith shall approve the design.",
+            "Operators must comply.",
+        ])
+
+    def test_case_insensitive_abbreviation(self) -> None:
+        # Mixed casing of the abbreviation token.
+        out = split_sentences("See FIG. 5. The diagram is canonical.")
+        self.assertEqual(out, [
+            "See FIG. 5.",
+            "The diagram is canonical.",
+        ])
+
 
 class TestBuiltInKeywordSets(unittest.TestCase):
     """Guardrails on the curated keyword lists — catches accidental drift."""
