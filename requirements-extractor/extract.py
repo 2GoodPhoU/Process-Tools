@@ -20,7 +20,7 @@ from requirements_extractor.cli import main
 _KNOWN_SUBCOMMANDS = {"requirements", "reqs", "actors", "scan"}
 # Top-level flags that may appear before a subcommand.  If we see one
 # of these, we scan past it to check whether a subcommand follows.
-_GLOBAL_FLAGS_WITH_VALUE = {"--config"}
+_GLOBAL_FLAGS_WITH_VALUE = {"--config", "--keywords"}
 _GLOBAL_FLAGS_NO_VALUE = {"-q", "--quiet", "--no-summary"}
 _HELP_FLAGS = {"-h", "--help"}
 

@@ -61,6 +61,7 @@ class GuiSettings:
     # Last-used paths (empty string = no preference).
     last_actors_path: str = ""
     last_config_path: str = ""
+    last_keywords_path: str = ""
     last_output_path: str = ""
     last_statement_set_path: str = ""
     last_input_dir: str = ""  # initialdir for "Add file(s)…" / "Add folder…"
@@ -73,6 +74,10 @@ class GuiSettings:
     # stable IDs, but skip writing any files.  Persisted off by default so
     # a forgetful user doesn't silently disable output across restarts.
     dry_run: bool = False
+    # When True, requirements mode first runs the actor scan on the same
+    # inputs and uses its output as the actors list — saves the "maintain
+    # a separate actors.xlsx" step for users who just want to go.
+    auto_actors: bool = False
 
     # Extraction mode the user last chose in the GUI.  Mirrors the CLI
     # subcommand names so the two surfaces stay in lockstep.  Unknown

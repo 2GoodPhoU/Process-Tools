@@ -39,8 +39,13 @@ The **Today, small** batch plus a **configurable file-format parser** have been 
 - §3.14 (GUI "Open actors template" button) — ✅ FIXED. New **Save template…** button in the Actors section calls ``gui_state.write_actors_template`` which emits a ready-to-fill .xlsx (with a Readme sheet) using the exact "Actor" / "Aliases" headers that ``load_actors_from_xlsx`` expects. Covered by ``TestActorsTemplate`` (round-trip test confirms the template parses back without error).
 - **Actor-only scan mode** (new capability, complements §1.7 in practice) — ✅ FIXED. A dedicated ``actors`` / ``scan`` CLI subcommand and an **Actors** mode in the GUI run the parser without keyword detection and emit a three-sheet workbook (Actors / Observations / Readme). The Actors sheet's header shape (``Actor`` / ``Aliases``) is directly consumable by ``--actors`` on a subsequent run, so users can bootstrap and iterate on an actors list cheaply. Seeded re-scans preserve canonical spellings verbatim and add only new variants as aliases. Covered by ``tests/test_actor_scan.py`` (23 tests: normalisation, grouping seeded/unseeded, end-to-end round-trip through ``load_actors_from_xlsx``, cancel/progress plumbing).
 - **Subcommand CLI + surface rename to `document-data-extractor`** — ✅ FIXED. The tool now presents as ``document-data-extractor`` (window title, packaging spec, README branding) to reflect that it does more than just requirements.  The CLI is git-style: ``document-data-extractor requirements SPECS/`` and ``document-data-extractor actors SPECS/`` (with ``reqs`` / ``scan`` aliases).  Global flags (``--config``, ``-q/--quiet``, ``--no-summary``) live on the root parser.  The legacy ``extract.py`` shim transparently rewrites flag-style argv to a ``requirements`` subcommand so older scripts keep working.  GUI exposes the mode as a top-of-window radio selector; the statement-set section greys out in actors mode; the chosen mode is persisted in ``GuiSettings`` and restored on next launch.  The Python package remains ``requirements_extractor`` internally so existing imports don't break.  Covered by ``tests/test_cli.py`` (23 tests: parser shape, per-subcommand flag parsing, alias passthrough, end-to-end dispatch, shim argv rewriting) plus ``TestGuiSettingsMode`` in ``tests/test_gui_state.py``.
+- §1.6 (preamble requirements dropped from statement set) — ✅ FIXED. ``statement_set.py`` now routes any `RequirementEvent` whose `row_ref == "Preamble"` under a synthetic ``(preamble)`` Level-2 bucket so preamble prose stays visible in the CSV instead of being silently dropped. The bucket's description explicitly tells reviewers to promote preamble items into real sections manually. Also handles the degenerate empty-hierarchy case (no H1, no H2, no section-row table) so every extracted row still reaches the output.
+- §3.2 (editable keyword lists) — ✅ FIXED. A new ``--keywords PATH`` global flag loads a standalone keywords file (``.yaml``/``.yml`` or ``.txt``/``.kw``) that tweaks just the HARD/SOFT lists without forcing users to author a full ``--config``. Two schemas are supported: "replace" (``hard: [shall, must]`` replaces the bucket wholesale via a ``"*"`` sentinel in the remove list) and "tweak" (``hard_add: [is to]`` / ``hard_remove: [will]`` adjusts the defaults). Mixing ``hard`` with ``hard_add``/``hard_remove`` in the same file is rejected with a clear error. The GUI exposes a matching "Keywords" field next to "Config" and persists ``last_keywords_path``. A sample file lives at ``samples/sample_keywords.yaml``.
+- §3.9 (statement-set respects H2/H3 doc headings) — ✅ FIXED. ``statement_set.py`` now tracks ``current_h2`` and ``current_h3`` alongside the old H1/section-row state and routes each event to its natural depth: H2 at L2, H3 at L3 (or L2 if the document skips H2), section rows at ``_depth_below_headings()``, requirements one level below the deepest structural anchor. The header width was bumped from 4 to 5 level pairs to accommodate the deeper nesting. Printed-anchor deduping lets a given heading emit its own row exactly once per ancestor context.
+- §3.13 (CLI UX polish) — ✅ FIXED. The CLI now has a ``RawDescriptionHelpFormatter`` with an epilog listing exit codes (``0/1/2/130`` for ok/runtime-error/usage-error/SIGINT) and per-subcommand Examples blocks. Named constants ``EXIT_OK``, ``EXIT_RUNTIME``, ``EXIT_USAGE`` replace bare integers. ``main()`` wraps dispatch in ``try/except`` for ``FileNotFoundError``/``ValueError``/``OSError`` (runtime errors return 1) and ``KeyboardInterrupt`` (returns 130). An ``_is_tty()`` helper is exposed for future compact-mode wiring. The module docstring now shows usage examples that cover ``--keywords`` and ``--auto-actors``.
+- **Auto-harvest actors before requirements extraction** (new feature) — ✅ FIXED. A new ``--auto-actors`` flag on the ``requirements`` subcommand (and a matching GUI checkbox in Options) runs the actor scan on the input docs first, writes the harvested list as ``<output_stem>_auto_actors.xlsx`` next to the requirements output, and uses that list as the ``--actors`` source for the requirements pass. Any explicit ``--actors`` is used to seed the scan and survives verbatim into the harvested list. Saves the "maintain a separate actors.xlsx" step for users who just want to get going; the sidecar file is deterministic and ready for inspection / tidy-up / reuse on subsequent runs.
 
-Still open (carried into the roadmap below): §1.6, §1.7, §1.9, §1.10, §2.4, §2.7, §2.8, §2.9, §2.13, §2.14, §3.1, §3.2 (beyond keyword tuning), §3.8, §3.9, §3.10, §3.12, §3.13, §3.15.
+Still open (carried into the roadmap below): §1.7, §1.9, §1.10, §2.4, §2.7, §2.8, §2.9, §2.13, §2.14, §3.1, §3.8, §3.10, §3.12, §3.15.
 
 ---
 
@@ -67,8 +72,10 @@ Still open (carried into the roadmap below): §1.6, §1.7, §1.9, §1.10, §2.4,
 ### 1.5 Section detection misses alphanumeric schemes — MEDIUM — ✅ FIXED
 The section-prefix recogniser had already been broadened during the config refactor to accept letter-prefixed labels (`A.1`, `SR-1.2`, `REQ-042`, `H1.2`). The remaining gap was letter-*suffix* subdivisions (`5.1.1a`, `5.1.1b`, `3.1b)`), common in IEEE/ISO specs: they fell through as "actor" rows and polluted statement-set output. The default pattern is now `^\s*(?:[A-Z]{1,4}[-.]?)?\d+(?:\.\d+)*[a-z]?[.)]?\s+\S` — a single optional lowercase letter after the last digit group, with the mandatory trailing whitespace keeping it off typos like `3.1abc` (no space) or legit title text like `3.1 a new feature` (where the lookbehind/adjacency rule correctly treats `a` as the start of the title, not part of the prefix). The config.py block has an expanded doc-comment enumerating exactly what the default matches, doesn't match, and how to override via YAML. Covered by four new tests in `TestTablesConfig`: letter-suffix acceptance, typo rejection, unstructured-title rejection, and paren-style retention; the original alphanumeric-prefix test is kept as a regression guard.
 
-### 1.6 Preamble requirements lack a primary actor — LOW
-`parser.py:251-262` scans prose before the first table with `primary_actor=""`. The Excel workbook is fine with that, but `statement_set.py:109` drops any preamble row from the CSV. If preamble prose is a likely home for high-level requirements, consider letting them into the statement set under a synthetic `Level 2 = "(Preamble)"` bucket rather than silently discarding.
+### 1.6 Preamble requirements lack a primary actor — LOW — ✅ FIXED
+`parser.py` used to emit preamble prose with `primary_actor=""` and `row_ref="Preamble"`. The Excel workbook handled that cleanly, but `statement_set.py` silently dropped any preamble row from the CSV, making important high-level requirements invisible when the reviewer worked from the statement-set rather than the workbook.
+
+**Resolution.** `statement_set.events_to_rows()` now routes any `RequirementEvent` whose `row_ref == "Preamble"` under a synthetic `Level 2 = "(preamble)"` bucket (constants `_PREAMBLE_L2_TITLE` / `_PREAMBLE_L2_DESC` in `statement_set.py`). The bucket's description explicitly tells reviewers to promote preamble items into a real section manually. The same `(preamble)` bucket also catches the degenerate no-H1/no-H2/no-section-row case so every extracted row reaches the output regardless of document structure.
 
 ### 1.7 Secondary-actor NER returns noisy raw text — LOW
 `actors.py:79-93` feeds `ent.text` directly into the output. spaCy NER readily returns determiners (`"the Auth Service"`), possessives, or ORG labels that aren't actors (`"ISO"`, `"USA"`). If the user-supplied actor list is present, consider gating NER to skip entities that don't have a lexical overlap with *any* canonical actor; otherwise restrict NER to just `PERSON`/`ORG` and canonicalise (strip leading `the`, trim trailing `'s`).
@@ -145,8 +152,15 @@ All output is raw `print`. Switch the progress callback internals to `logging.ge
 ### 3.1 `.doc` (legacy) support — MEDIUM
 `extractor.py:69-72` rejects non-.docx files with a one-line error. Teams often have `.doc` specs lingering. Options: (a) detect `.doc` and shell out to `libreoffice --headless --convert-to docx` when available, or (b) use `antiword`/`textract` as a softer fallback for text-only extraction.
 
-### 3.2 Editable keyword lists without code changes — MEDIUM
-`detector.py` holds the word lists in code. For a non-technical audience, let them live as an editable YAML/TXT next to the exe (or in `%APPDATA%` / `~/.config`), with fallbacks to defaults. `--keywords path.yaml` on the CLI and a "Keywords…" button in the GUI would make per-project tuning possible without rebuilds.
+### 3.2 Editable keyword lists without code changes — MEDIUM — ✅ FIXED
+`detector.py` holds the word lists in code. For a non-technical audience, editing Python is a non-starter; the prior `--config` path let them tune keywords only as part of a larger config dict, which felt heavy for a single-knob change.
+
+**Resolution.** A new global `--keywords PATH` flag loads a **standalone** keywords file that tweaks just the HARD/SOFT buckets without forcing a full `--config`. Two schemas are supported:
+
+- **Tweak the defaults** (most common): `hard_add: [is to]` / `hard_remove: [will]` / `soft_add: [anticipated]` / `soft_remove: []`. Stacks on top of the built-in lists.
+- **Replace a bucket wholesale**: `hard: [shall, must]` / `soft: [should, may]`. Internally this translates into an add+remove shape using a `"*"` sentinel in the remove list, so the existing add/remove pipeline in `detector._apply_add_remove` handles both schemas on one code path.
+
+Mixing `hard` with `hard_add` / `hard_remove` in the same file is rejected with a clear error — the two intents contradict each other. The text format (`.txt` / `.kw`) uses `[hard]` / `[soft]` / `[hard_add]` section markers for non-YAML-comfortable users. The GUI exposes a matching "Keywords" field next to "Config" in the config section, persists `last_keywords_path` across restarts, and supports browsing for `*.yaml *.yml *.txt *.kw`. A fully-documented example lives at `samples/sample_keywords.yaml`.
 
 ### 3.3 Dry-run / preview mode — MEDIUM — ✅ FIXED
 `requirements --dry-run` runs the full parse + detect + ID-assignment pipeline and prints the usual summary, but skips writing both the Excel workbook and any `--statement-set` CSV. `--show-samples N` additionally prints the first N detected requirements (stable ID, type, primary actor, text preview) so users can eyeball what was matched before spending disk on it. Plumbed through as a `dry_run` kwarg on `extract_from_files`; existing callers (GUI, legacy tests) pick up the default `False` without change. Covered by `TestDryRunEndToEnd` (extractor-level) and `TestDryRunCLI` (argparse wiring + end-to-end `main()` invocation) in `tests/test_stable_ids.py`, plus updated flag coverage in `tests/test_cli.py`.
@@ -168,8 +182,10 @@ The current `Row Ref`/`Block Ref` string tells you *where* the requirement is in
 - A hyperlink in the Excel cell that opens the source .docx (writer can set `cell.hyperlink = str(path)`).
 - A short context snippet — 1–2 lines before/after — as a separate `Context` column.
 
-### 3.9 Statement-set: respect H2/H3 — MEDIUM
-`statement_set.py:89-92` drops `HeadingEvent` levels ≥ 2. For docs that use `Heading 2` and `Heading 3` as genuine structure (not just table-based sections), this flattens the tree. Either map H2 → L2 and move section-row topics to L3 (and actors to L4), or add a CLI flag `--statement-set-style={table, heading}` to let users pick.
+### 3.9 Statement-set: respect H2/H3 — MEDIUM — ✅ FIXED
+`statement_set.py` used to drop `HeadingEvent` levels ≥ 2. For docs that use Heading 2 / Heading 3 as genuine structure (not just table-based sections), this flattened the tree and lost important reviewer context.
+
+**Resolution.** `statement_set.events_to_rows()` now tracks `current_h2` and `current_h3` alongside the existing H1 / section-row state, and routes each event to its natural depth: H2 anchors at L2, H3 at L3 (or L2 if the document skipped H2 — we don't invent a missing level), section rows at `_depth_below_headings()` (which shifts based on what H2/H3 context is in scope), and requirements land one level below the deepest structural anchor. The header width was bumped from 4 to 5 level pairs to accommodate the deeper nesting, with the requirement level clamped at `_HEADER_LEVEL_PAIRS` so a runaway document doesn't blow past the CSV template. Printed-anchor deduping (a `set[Tuple[str, ...]]` keyed by ancestor chain) lets a given heading emit its own row exactly once per context — so if the same H2 appears under two different H1s, both get their own anchor row. A new H1 resets the whole subtree.
 
 ### 3.10 Additional output formats — LOW
 Common requests once a team has this running:
@@ -185,10 +201,12 @@ Every requirement now gets a `REQ-<8hex>` identifier written to a new **ID** col
 ### 3.12 Diff mode — LOW
 `requirements-extractor diff old.xlsx new.xlsx` that colour-codes added/removed/changed rows in a third workbook would be a killer feature for change-control meetings.
 
-### 3.13 CLI UX polish — LOW
-- Add `-v/--verbose` (currently only `-q`).
-- Exit codes beyond 0/2: consider non-zero when any `stats.errors` is recorded, so CI can fail on parse errors.
-- `--summary-json PATH` for machine-readable stats.
+### 3.13 CLI UX polish — LOW — ✅ FIXED
+The CLI previously returned an undifferentiated `0`/`2`, had no usage examples visible to `--help`, and relied on argparse's default error surface for every failure mode.
+
+**Resolution.** Named exit-code constants (`EXIT_OK=0`, `EXIT_RUNTIME=1`, `EXIT_USAGE=2`) replace bare integers everywhere in `cli.py`. The parser and both subparsers use `RawDescriptionHelpFormatter` so a new epilog with per-command **Examples** blocks and (on the root parser) an **Exit codes** block is visible to `--help`. `main()` now wraps dispatch in `try/except`: `FileNotFoundError`/`ValueError`/`OSError` bubble up as `Error: ...` on stderr and return `EXIT_RUNTIME` (the "user can fix it" set — corrupt docx, bad config, permission denied); `KeyboardInterrupt` prints `Interrupted.` and returns `130` to match the CLI-as-script convention for SIGINT. An `_is_tty()` helper is exposed for future compact-mode callers. The module docstring now includes worked examples for `--keywords` and `--auto-actors`.
+
+Not yet implemented (deferred to a future pass): `-v/--verbose` escalation, non-zero on recorded `stats.errors` for CI use, `--summary-json PATH` for machine-readable stats. The exit-code ladder is now large enough to accept a fourth code (e.g. `3 = completed with warnings`) without breaking the existing contract.
 
 ### 3.14 GUI "Open actors template" button — LOW — ✅ FIXED
 Non-technical users often struggle to get the actors file started. A "Download actors template" button that copies `samples/actors.sample.xlsx` to a user-chosen location would remove that friction.
@@ -204,9 +222,9 @@ Non-technical users often struggle to get the actors file started. A "Download a
 
 If you want a concrete roadmap:
 
-1. **Today, small**: fix §2.1 (duplicate column), §2.2 (dead property), §2.3 (unused imports), §2.5 (quiet+summary), §2.6 (`_MAX_LEVEL` doc).
+1. **Today, small**: fix §2.1 (duplicate column), §2.2 (dead property), §2.3 (unused imports), §2.5 (quiet+summary), §2.6 (`_MAX_LEVEL` doc). *(All done.)*
 2. **This week**: §1.1 and §1.2 (high-signal detector fixes), §2.12 (add pytest + 10 golden tests so you can safely refactor the detector), §1.4 (negation), §3.3 (`--dry-run`). *(All done.)*
-3. **Next**: §1.3 (sentence splitter — done), §1.5 (alphanumeric sections — done), §3.2 (external keyword file), §3.11 (stable IDs — done), §3.9 (statement-set heading-style option).
-4. **Nice-to-have**: §3.5–3.7 (GUI polish), §3.1 (.doc support), §3.10 (extra output formats), §3.12 (diff mode).
+3. **Next**: §1.3 (sentence splitter — done), §1.5 (alphanumeric sections — done), §3.2 (external keyword file — done), §3.11 (stable IDs — done), §3.9 (statement-set heading-style — done), §1.6 (preamble bucket — done), §3.13 (CLI UX polish — done), auto-harvest actors (done).
+4. **Nice-to-have**: §3.5–3.7 (GUI polish — done), §3.1 (.doc support), §3.10 (extra output formats), §3.12 (diff mode), §3.13 finish-up (``-v/--verbose``, ``--summary-json``), §1.7 (NER canonicalisation), §1.9 (confidence heuristic upgrade), §1.10 (cross-source dedup).
 
 Items §1.1, §1.2, §2.1, and §2.5 are all one-liners or near-one-liners and would materially improve the user-facing quality right away.

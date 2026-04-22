@@ -95,6 +95,7 @@ class ExtractorApp:
         self.mode = StringVar(value=self.settings.mode)
         self.actors_file = StringVar(value=self.settings.last_actors_path)
         self.config_file = StringVar(value=self.settings.last_config_path)
+        self.keywords_file = StringVar(value=self.settings.last_keywords_path)
         self.output_file = StringVar(
             value=self.settings.last_output_path
             or str(Path.cwd() / _default_output_name(self.settings.mode))
@@ -110,6 +111,9 @@ class ExtractorApp:
         # the CLI ``--dry-run`` flag.  Useful for previewing counts before
         # overwriting an existing output.
         self.dry_run = BooleanVar(value=self.settings.dry_run)
+        # Auto-actors — run the actor scan first and feed its output back
+        # into the requirements pass.  Requirements-mode only.
+        self.auto_actors = BooleanVar(value=self.settings.auto_actors)
 
         # Run state ------------------------------------------------------ #
         self._cancel_event = threading.Event()
@@ -210,21 +214,49 @@ class ExtractorApp:
 
     def _build_config_section(self, parent: ttk.Frame, pad: dict) -> None:
         frame = ttk.LabelFrame(
-            parent, text="3. Config file (optional YAML \u2014 document format hints)"
+            parent, text="3. Config & keyword files (both optional YAML)"
         )
         frame.pack(fill="x", **pad)
-        row = ttk.Frame(frame)
-        row.pack(fill="x", padx=4, pady=4)
-        ttk.Entry(row, textvariable=self.config_file).pack(side="left", fill="x", expand=True)
-        ttk.Button(row, text="Browse\u2026", command=self._browse_config).pack(side="left", padx=4)
-        ttk.Button(row, text="Clear", command=lambda: self.config_file.set("")).pack(side="left")
+
+        # --- Full config (document format hints) --- #
+        cfg_row = ttk.Frame(frame)
+        cfg_row.pack(fill="x", padx=4, pady=(4, 2))
+        ttk.Label(cfg_row, text="Config:", width=10).pack(side="left")
+        ttk.Entry(cfg_row, textvariable=self.config_file).pack(
+            side="left", fill="x", expand=True,
+        )
+        ttk.Button(cfg_row, text="Browse\u2026", command=self._browse_config).pack(
+            side="left", padx=4,
+        )
+        ttk.Button(cfg_row, text="Clear", command=lambda: self.config_file.set("")).pack(
+            side="left",
+        )
+
+        # --- Standalone keywords file --- #
+        kw_row = ttk.Frame(frame)
+        kw_row.pack(fill="x", padx=4, pady=(0, 2))
+        ttk.Label(kw_row, text="Keywords:", width=10).pack(side="left")
+        ttk.Entry(kw_row, textvariable=self.keywords_file).pack(
+            side="left", fill="x", expand=True,
+        )
+        ttk.Button(kw_row, text="Browse\u2026", command=self._browse_keywords).pack(
+            side="left", padx=4,
+        )
+        ttk.Button(kw_row, text="Clear", command=lambda: self.keywords_file.set("")).pack(
+            side="left",
+        )
+
         ttk.Label(
             frame,
             text=(
                 "Tip: place <docname>.reqx.yaml next to any .docx and it "
-                "will be auto-loaded for that file."
+                "will be auto-loaded for that file.  The keywords file is "
+                "a lightweight alternative when you only need to tune the "
+                "HARD/SOFT keyword lists \u2014 see samples/sample_keywords.yaml."
             ),
             foreground="#555",
+            wraplength=640,
+            justify="left",
         ).pack(anchor="w", padx=4, pady=(0, 4))
 
     # --- section: options --- #
@@ -250,6 +282,16 @@ class ExtractorApp:
             ),
             variable=self.dry_run,
         ).pack(anchor="w", padx=4, pady=2)
+        self.auto_actors_cb = ttk.Checkbutton(
+            frame,
+            text=(
+                "Auto-harvest actors first \u2014 scans the inputs once to "
+                "build an actor list, then uses it for the requirements pass "
+                "(overrides the Actors list above; requirements mode only)"
+            ),
+            variable=self.auto_actors,
+        )
+        self.auto_actors_cb.pack(anchor="w", padx=4, pady=2)
 
     # --- section: output --- #
 
@@ -450,6 +492,18 @@ class ExtractorApp:
         if f:
             self.config_file.set(f)
 
+    def _browse_keywords(self) -> None:
+        f = filedialog.askopenfilename(
+            title="Select keywords file",
+            filetypes=[
+                ("YAML files", "*.yaml *.yml"),
+                ("Text files", "*.txt *.kw"),
+                ("All files", "*.*"),
+            ],
+        )
+        if f:
+            self.keywords_file.set(f)
+
     def _browse_output(self) -> None:
         f = filedialog.asksaveasfilename(
             title="Save output as",
@@ -533,6 +587,9 @@ class ExtractorApp:
         config_raw = self.config_file.get().strip()
         config = Path(config_raw) if config_raw else None
 
+        keywords_raw = self.keywords_file.get().strip()
+        keywords = Path(keywords_raw) if keywords_raw else None
+
         ss_path: Optional[Path] = None
         if self.export_statement_set.get():
             ss_raw = self.statement_set_file.get().strip()
@@ -556,16 +613,48 @@ class ExtractorApp:
 
         inputs_snapshot = list(self.input_files)
         dry_run = bool(self.dry_run.get())
+        auto_actors = bool(self.auto_actors.get())
 
         def worker() -> None:
+            effective_actors = actors
             try:
+                if auto_actors:
+                    # Harvest actors first, then pass the result through as
+                    # the --actors source.  Writes a sidecar file next to
+                    # the final output so the user can inspect it later.
+                    base = Path(out_path)
+                    auto_actors_path = (
+                        base.parent / f"{base.stem}_auto_actors.xlsx"
+                    )
+                    self.root.after(
+                        0, self._log,
+                        f"Auto-actors: scanning inputs \u2192 {auto_actors_path.name}",
+                    )
+                    scan_result = scan_actors_from_files(
+                        input_paths=inputs_snapshot,
+                        output_path=auto_actors_path,
+                        seed_actors_xlsx=actors,
+                        use_nlp=self.use_nlp.get(),
+                        config_path=config,
+                        keywords_path=keywords,
+                        progress=lambda m: self.root.after(0, self._log, m),
+                        file_progress=lambda i, n, name: self.root.after(
+                            0, self._on_file_progress, i, n, name
+                        ),
+                        cancel_check=self._cancel_event.is_set,
+                    )
+                    effective_actors = scan_result.output_path
+                    # Reset progress bar for the requirements pass that
+                    # follows so the user sees fresh per-file progress.
+                    self.root.after(0, self._reset_progress, len(inputs_snapshot))
                 result = extract_from_files(
                     input_paths=inputs_snapshot,
                     output_path=Path(out_path),
-                    actors_xlsx=actors,
+                    actors_xlsx=effective_actors,
                     use_nlp=self.use_nlp.get(),
                     statement_set_path=ss_path,
                     config_path=config,
+                    keywords_path=keywords,
                     progress=lambda m: self.root.after(0, self._log, m),
                     file_progress=lambda i, n, name: self.root.after(
                         0, self._on_file_progress, i, n, name
@@ -611,6 +700,9 @@ class ExtractorApp:
         self.progress.config(value=i, maximum=max(1, n))
         self.status_var.set(f"Parsing {i}/{n}: {name}")
 
+    def _reset_progress(self, total: int) -> None:
+        self.progress.config(value=0, maximum=max(1, total))
+
     def _cancel(self) -> None:
         self._cancel_event.set()
         self.cancel_btn.config(state="disabled")
@@ -650,6 +742,9 @@ class ExtractorApp:
         config_raw = self.config_file.get().strip()
         config = Path(config_raw) if config_raw else None
 
+        keywords_raw = self.keywords_file.get().strip()
+        keywords = Path(keywords_raw) if keywords_raw else None
+
         self.input_files = dedupe_paths(self.input_files)
         inputs_snapshot = list(self.input_files)
 
@@ -668,6 +763,7 @@ class ExtractorApp:
                     seed_actors_xlsx=seed,
                     use_nlp=self.use_nlp.get(),
                     config_path=config,
+                    keywords_path=keywords,
                     progress=lambda m: self.root.after(0, self._log, m),
                     file_progress=lambda i, n, name: self.root.after(
                         0, self._on_file_progress, i, n, name
@@ -723,12 +819,14 @@ class ExtractorApp:
         self.settings.window_geometry = geom or self.settings.window_geometry
         self.settings.last_actors_path = self.actors_file.get().strip()
         self.settings.last_config_path = self.config_file.get().strip()
+        self.settings.last_keywords_path = self.keywords_file.get().strip()
         self.settings.last_output_path = self.output_file.get().strip()
         self.settings.last_statement_set_path = self.statement_set_file.get().strip()
         self.settings.use_nlp = bool(self.use_nlp.get())
         self.settings.export_statement_set = bool(self.export_statement_set.get())
         self.settings.open_output_on_done = bool(self.open_output_on_done.get())
         self.settings.dry_run = bool(self.dry_run.get())
+        self.settings.auto_actors = bool(self.auto_actors.get())
         self.settings.mode = self.mode.get()
         self.settings.remember_inputs(self.input_files)
         return self.settings

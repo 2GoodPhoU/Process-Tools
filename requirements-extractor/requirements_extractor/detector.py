@@ -274,10 +274,19 @@ def _apply_add_remove(
     add: Iterable[str],
     remove: Iterable[str],
 ) -> Set[str]:
+    """Return the baseline with ``remove`` dropped and ``add`` merged in.
+
+    The special sentinel ``"*"`` in the ``remove`` list means "wipe every
+    baseline entry" — it's how :func:`config.load_keywords_raw` encodes
+    the ``hard: [...]`` / ``soft: [...]`` replace-the-bucket shape.
+    """
     remove_lower = {r.strip().lower() for r in remove if r and r.strip()}
-    out = {k.lower() for k in baseline if k.lower() not in remove_lower}
+    if "*" in remove_lower:
+        out: Set[str] = set()
+    else:
+        out = {k.lower() for k in baseline if k.lower() not in remove_lower}
     for a in add or []:
-        if a and a.strip():
+        if a and a.strip() and a.strip() != "*":
             out.add(a.strip().lower())
     return out
 

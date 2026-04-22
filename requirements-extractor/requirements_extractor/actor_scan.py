@@ -574,6 +574,7 @@ def scan_actors_from_files(
     seed_actors_xlsx: Optional[Path] = None,
     use_nlp: bool = False,
     config_path: Optional[Path] = None,
+    keywords_path: Optional[Path] = None,
     progress: Optional[Callable[[str], None]] = None,
     file_progress: Optional[Callable[[int, int, str], None]] = None,
     cancel_check: Optional[Callable[[], bool]] = None,
@@ -613,14 +614,33 @@ def scan_actors_from_files(
         log(f"WARNING: {stats.errors[-1]}")
 
     run_config_path: Optional[Path] = Path(config_path) if config_path else None
+    run_keywords_path: Optional[Path] = Path(keywords_path) if keywords_path else None
     if run_config_path is not None:
         try:
-            resolve_config(run_config_path=run_config_path, docx_path=None)
+            resolve_config(
+                run_config_path=run_config_path,
+                docx_path=None,
+                keywords_path=run_keywords_path,
+            )
             log(f"Loaded run config: {run_config_path.name}")
         except Exception as e:  # noqa: BLE001
             stats.errors.append(f"Failed to load config {run_config_path}: {e}")
             log(f"WARNING: {stats.errors[-1]}")
             run_config_path = None
+    elif run_keywords_path is not None:
+        try:
+            resolve_config(
+                run_config_path=None,
+                docx_path=None,
+                keywords_path=run_keywords_path,
+            )
+            log(f"Loaded keywords file: {run_keywords_path.name}")
+        except Exception as e:  # noqa: BLE001
+            stats.errors.append(
+                f"Failed to load keywords file {run_keywords_path}: {e}"
+            )
+            log(f"WARNING: {stats.errors[-1]}")
+            run_keywords_path = None
 
     observations: List[ActorObservation] = []
     input_list = list(input_paths)
@@ -647,7 +667,9 @@ def scan_actors_from_files(
 
         try:
             cfg: Config = resolve_config(
-                run_config_path=run_config_path, docx_path=path,
+                run_config_path=run_config_path,
+                docx_path=path,
+                keywords_path=run_keywords_path,
             )
         except Exception as e:  # noqa: BLE001
             stats.errors.append(

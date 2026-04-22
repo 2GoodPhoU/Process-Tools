@@ -330,14 +330,18 @@ def autodiscover_config(docx_path: Path) -> Optional[Path]:
 def resolve_config(
     run_config_path: Optional[Path] = None,
     docx_path: Optional[Path] = None,
+    keywords_path: Optional[Path] = None,
 ) -> Config:
     """Build a Config for one document.
 
     Layers (each one overrides the one above):
       1. Dataclass defaults.
       2. Per-run config (``run_config_path``), if given.
-      3. Per-doc config (``<docstem>.reqx.yaml`` next to ``docx_path``),
-         if it exists.
+      3. Standalone keywords file (``keywords_path``), if given — a small
+         YAML with just the keyword knobs.  See :func:`load_keywords_raw`.
+         Overrides the ``keywords:`` section of the per-run config only.
+      4. Per-doc config (``<docstem>.reqx.yaml`` next to ``docx_path``),
+         if it exists — can override anything above.
 
     Returns a Config with ``source`` set to a ``+``-joined list of paths
     that actually contributed.
@@ -349,6 +353,11 @@ def resolve_config(
         raw = load_config_raw(Path(run_config_path))
         layers_raw.append(raw)
         origins.append(str(run_config_path))
+
+    if keywords_path is not None:
+        kw_raw = load_keywords_raw(Path(keywords_path))
+        layers_raw.append({"keywords": kw_raw})
+        origins.append(f"keywords:{Path(keywords_path).name}")
 
     if docx_path is not None:
         per_doc = autodiscover_config(Path(docx_path))
@@ -363,3 +372,174 @@ def resolve_config(
 
     source = " + ".join(origins) if origins else "default"
     return build_config(merged, source=source)
+
+
+# ---------------------------------------------------------------------------
+# Standalone keywords file — a smaller, purpose-built surface so non-technical
+# users can tune just the keyword lists without learning the full config
+# schema.  Can be combined with a full --config.
+# ---------------------------------------------------------------------------
+
+
+#: Field names allowed in a standalone keywords file.  ``hard`` / ``soft``
+#: REPLACE the built-in list for that bucket; the ``*_add`` / ``*_remove``
+#: variants tweak the built-in list.  Mixing ``hard`` and ``hard_add`` in
+#: the same file is rejected — they contradict each other.
+_KEYWORDS_FIELDS = frozenset({
+    "hard", "soft",
+    "hard_add", "hard_remove", "soft_add", "soft_remove",
+})
+
+
+def load_keywords_raw(path: Path) -> Dict[str, Any]:
+    """Load a standalone keywords YAML and return a ``keywords:``-shaped dict.
+
+    Supported schemas (both YAML, both optional at the field level):
+
+    1. **Replace** — wholesale replacement of a bucket::
+
+           hard: [shall, must, is to]
+           soft: [should, may]
+
+       The built-in lists for ``hard`` / ``soft`` are discarded and only
+       the listed words count.  Empty list means "nothing in this bucket".
+
+    2. **Tweak** — keep built-ins, then add/remove::
+
+           hard_add:    [is to, are to]
+           hard_remove: [will]
+           soft_add:    []
+           soft_remove: []
+
+       Equivalent to writing the same keys under ``keywords:`` in a
+       regular ``--config`` file.
+
+    Shapes can be combined across buckets (``hard: ...`` + ``soft_add: ...``)
+    but cannot be combined *within* a bucket (``hard`` + ``hard_add``).
+
+    Accepts both ``.yaml`` / ``.yml`` and ``.txt`` extensions — the
+    ``.txt`` path treats each non-blank, non-comment line as a ``hard``
+    keyword, section-marker lines (``[hard]`` / ``[soft]`` /
+    ``[hard_remove]`` …) flip the current bucket.  Good for one-liner
+    tweaks without reaching for YAML syntax.
+
+    Raises ``FileNotFoundError`` / ``ValueError`` on problems — caller
+    is expected to surface these to the user.
+    """
+    path = Path(path)
+    if not path.exists():
+        raise FileNotFoundError(f"Keywords file not found: {path}")
+
+    suffix = path.suffix.lower()
+    if suffix in {".yaml", ".yml"}:
+        try:
+            import yaml  # type: ignore
+        except ImportError as exc:
+            raise ImportError(
+                "PyYAML is required to load YAML keywords files.  "
+                "Install with:  pip install pyyaml"
+            ) from exc
+        with path.open("r", encoding="utf-8") as fh:
+            raw = yaml.safe_load(fh) or {}
+        if not isinstance(raw, dict):
+            raise ValueError(
+                f"{path.name}: keywords file root must be a mapping "
+                f"(got {type(raw).__name__})."
+            )
+    elif suffix in {".txt", ".kw", ""}:
+        raw = _parse_keywords_txt(path)
+    else:
+        raise ValueError(
+            f"{path.name}: unsupported keywords file extension '{suffix}'. "
+            f"Use .yaml, .yml, .txt, or .kw."
+        )
+
+    unknown = set(raw.keys()) - _KEYWORDS_FIELDS
+    if unknown:
+        raise ValueError(
+            f"{path.name}: unknown keys {sorted(unknown)}.  "
+            f"Allowed: {sorted(_KEYWORDS_FIELDS)}."
+        )
+
+    # Each value must be a list (if present).
+    for key, val in list(raw.items()):
+        if val is None:
+            raw[key] = []
+            continue
+        if not isinstance(val, list):
+            raise ValueError(
+                f"{path.name}: key '{key}' must be a list of strings "
+                f"(got {type(val).__name__})."
+            )
+        raw[key] = [str(x).strip() for x in val if str(x).strip()]
+
+    # "hard" + "hard_add" / "hard_remove" in the same file is an obvious
+    # user mistake — the two shapes contradict each other.  Catch early.
+    for bucket in ("hard", "soft"):
+        if bucket in raw and (f"{bucket}_add" in raw or f"{bucket}_remove" in raw):
+            raise ValueError(
+                f"{path.name}: '{bucket}' replaces the bucket entirely — "
+                f"don't combine it with '{bucket}_add' / '{bucket}_remove' "
+                f"in the same file."
+            )
+
+    # Translate "replace" shape into add/remove shape the rest of the
+    # pipeline already understands.  For "hard: [X, Y]" we emit:
+    #     hard_remove = baseline_hard  (caller applies: "drop all builtins")
+    #     hard_add    = [X, Y]
+    # We express "drop everything built-in" with a special sentinel: the
+    # string "*".  KeywordsConfig / KeywordMatcher are taught to honour it.
+    result: Dict[str, Any] = {
+        "hard_add": list(raw.get("hard_add", [])),
+        "hard_remove": list(raw.get("hard_remove", [])),
+        "soft_add": list(raw.get("soft_add", [])),
+        "soft_remove": list(raw.get("soft_remove", [])),
+    }
+    if "hard" in raw:
+        result["hard_remove"] = ["*"]
+        result["hard_add"] = list(raw["hard"])
+    if "soft" in raw:
+        result["soft_remove"] = ["*"]
+        result["soft_add"] = list(raw["soft"])
+
+    return result
+
+
+def _parse_keywords_txt(path: Path) -> Dict[str, List[str]]:
+    """Minimal text-format parser for one-liner keyword tweaks.
+
+    Format::
+
+        # comments start with '#'
+        [hard_add]
+        is to
+        are to
+
+        [hard_remove]
+        will
+
+        [soft_add]
+        recommended
+
+    Lines before any section marker are treated as ``hard_add`` entries.
+    Unknown sections raise ``ValueError``.
+    """
+    buckets: Dict[str, List[str]] = {}
+    current = "hard_add"
+    with path.open("r", encoding="utf-8") as fh:
+        for raw_line in fh:
+            line = raw_line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if line.startswith("[") and line.endswith("]"):
+                section = line[1:-1].strip().lower()
+                if section not in _KEYWORDS_FIELDS:
+                    raise ValueError(
+                        f"{path.name}: unknown section '[{section}]'.  "
+                        f"Allowed: {sorted(_KEYWORDS_FIELDS)}."
+                    )
+                current = section
+                buckets.setdefault(current, [])
+                continue
+            buckets.setdefault(current, []).append(line)
+    return buckets

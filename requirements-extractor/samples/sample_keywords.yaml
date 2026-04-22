@@ -1,0 +1,50 @@
+# Example standalone keywords file.
+#
+# Use via:
+#     document-data-extractor --keywords sample_keywords.yaml requirements spec.docx
+#
+# This file tweaks only the HARD/SOFT requirement keyword lists — it does
+# NOT replace the full --config.  Pair the two if you want both keyword
+# tuning AND structural hints (skip_sections, tables, content filters).
+#
+# Two schemas are supported.  Mix them across buckets freely, but don't
+# combine "hard" with "hard_add"/"hard_remove" in the same file — the
+# loader will reject that contradiction explicitly.
+#
+# ---------------------------------------------------------------------------
+# Schema 1 — Tweak the built-in lists (most common).
+# ---------------------------------------------------------------------------
+#
+# The built-in HARD list is:
+#   shall, must, required, mandatory, is to, are to
+# The built-in SOFT list is:
+#   should, may, might, can, could, will, recommended, preferred, ought to
+#
+# hard_add:    [is to, are to]    # extra hard keywords beyond the defaults
+# hard_remove: [will]             # drop noisy hard matches
+# soft_add:    [anticipated]      # add domain-specific soft keywords
+# soft_remove: []
+#
+# ---------------------------------------------------------------------------
+# Schema 2 — Replace a bucket entirely.
+# ---------------------------------------------------------------------------
+#
+# Use this when your house style is narrower than the built-in defaults.
+# Everything not listed is classified as "not a requirement".
+#
+# hard: [shall, must]
+# soft: [should, may]
+
+# Example (uncomment to use):
+
+hard_add:
+  - is to
+  - are to
+
+hard_remove: []
+
+soft_add:
+  - anticipated
+  - expected to
+
+soft_remove: []

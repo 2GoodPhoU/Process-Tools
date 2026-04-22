@@ -46,6 +46,7 @@ def extract_from_files(
     use_nlp: bool = False,
     statement_set_path: Optional[Path] = None,
     config_path: Optional[Path] = None,
+    keywords_path: Optional[Path] = None,
     progress: Optional[Callable[[str], None]] = None,
     file_progress: Optional[Callable[[int, int, str], None]] = None,
     cancel_check: Optional[Callable[[], bool]] = None,
@@ -101,14 +102,35 @@ def extract_from_files(
     # Validate the per-run config once up front so typos surface before we
     # parse any documents.  (Per-doc overrides are loaded lazily below.)
     run_config_path: Optional[Path] = Path(config_path) if config_path else None
+    run_keywords_path: Optional[Path] = Path(keywords_path) if keywords_path else None
     if run_config_path is not None:
         try:
-            resolve_config(run_config_path=run_config_path, docx_path=None)
+            resolve_config(
+                run_config_path=run_config_path,
+                docx_path=None,
+                keywords_path=run_keywords_path,
+            )
             log(f"Loaded run config: {run_config_path.name}")
         except Exception as e:  # noqa: BLE001
             stats.errors.append(f"Failed to load config {run_config_path}: {e}")
             log(f"WARNING: {stats.errors[-1]}")
             run_config_path = None
+    elif run_keywords_path is not None:
+        # No main --config, but we still want to catch a broken keywords
+        # file up front instead of on first document.
+        try:
+            resolve_config(
+                run_config_path=None,
+                docx_path=None,
+                keywords_path=run_keywords_path,
+            )
+            log(f"Loaded keywords file: {run_keywords_path.name}")
+        except Exception as e:  # noqa: BLE001
+            stats.errors.append(
+                f"Failed to load keywords file {run_keywords_path}: {e}"
+            )
+            log(f"WARNING: {stats.errors[-1]}")
+            run_keywords_path = None
 
     all_reqs: List[Requirement] = []
     events_per_file: List[Tuple[str, List[object]]] = []
@@ -137,7 +159,9 @@ def extract_from_files(
         # Per-doc config discovery happens here so each file can override.
         try:
             cfg: Config = resolve_config(
-                run_config_path=run_config_path, docx_path=path,
+                run_config_path=run_config_path,
+                docx_path=path,
+                keywords_path=run_keywords_path,
             )
         except Exception as e:  # noqa: BLE001
             stats.errors.append(

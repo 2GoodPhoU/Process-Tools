@@ -112,8 +112,10 @@ A window opens. Pick **Extraction mode** (Requirements or Actors) at the top, ad
 
 - **Drag-and-drop** — drop `.docx` files or folders directly onto the input list. Requires `pip install tkinterdnd2` (optional — the UI degrades to buttons if it isn't installed).
 - **Save actors template\u2026** — click this button in the Actors section to generate a ready-to-fill `actors_template.xlsx` instead of hand-rolling one.
+- **Auto-actors** — in Options, tick "Run actor scan first and use its output as the actors list" to harvest actors from the same inputs before the requirements pass, without having to maintain a separate `actors.xlsx`. The harvested list is written as a sidecar next to your output (`<output_stem>_auto_actors.xlsx`) so you can inspect and reuse it later.
+- **Keywords field** — next to **Config file**, the Options section now has a **Keywords** field for a standalone keywords file (`.yaml` / `.yml` / `.txt` / `.kw`) that tweaks just the HARD/SOFT lists. See "Keywords file" below.
 - **Actors mode** — switch the top radio to "Actors" to run the parser across your inputs and produce a ready-to-use actors workbook from what the documents actually contain. See the "Actors mode" section below.
-- **Remembered settings** — window size, last-used paths, checkbox states, and the last-used mode are persisted to `~/.requirements_extractor/settings.json` and restored next launch.
+- **Remembered settings** — window size, last-used paths (including the Keywords field), checkbox states (including auto-actors), and the last-used mode are persisted to `~/.requirements_extractor/settings.json` and restored next launch.
 
 > Tip for Windows users: rename `run_gui.py` to `run_gui.pyw` to suppress the background console window when you double-click.
 
@@ -149,6 +151,16 @@ python extract.py requirements spec.docx -o out.xlsx --statement-set statement_s
 # iterating on a config or previewing a new corpus
 python extract.py requirements spec.docx --dry-run --show-samples 5
 
+# Auto-actors — harvest the actors list from the same inputs first,
+# then use it for the requirements run.  Saves maintaining a
+# separate actors.xlsx.  The harvested list is written as a sidecar
+# <output_stem>_auto_actors.xlsx next to your output.
+python extract.py requirements C:\Projects\Specs --auto-actors -o out.xlsx
+
+# Tweak just the HARD/SOFT keyword buckets via a standalone YAML,
+# without writing a full --config.  See "Keywords file" below.
+python extract.py --keywords house_style.yaml requirements spec.docx
+
 # Actors mode — build an actors list from a corpus instead of
 # extracting requirements.  Output round-trips into --actors.
 python extract.py actors C:\Projects\Specs -o actors_scan.xlsx
@@ -158,7 +170,14 @@ python extract.py reqs spec.docx -o out.xlsx
 python extract.py scan C:\Projects\Specs -o actors.xlsx
 ```
 
-Run `python extract.py --help` to see every option, or `python extract.py requirements --help` / `python extract.py actors --help` for mode-specific flags.
+Run `python extract.py --help` to see every option, or `python extract.py requirements --help` / `python extract.py actors --help` for mode-specific flags (each has its own Examples block in the help output).
+
+**Exit codes** — scripted callers can rely on:
+
+- `0` — success (also returned for a clean `--dry-run`).
+- `1` — runtime error the user can fix (corrupt `.docx`, bad config, I/O error, permission denied on the output path).
+- `2` — usage error (missing inputs, unknown flags, no subcommand given).
+- `130` — interrupted by the user (SIGINT / Ctrl-C).
 
 ---
 
@@ -275,17 +294,60 @@ Unknown keys are rejected up front with a clear error message so typos don't sil
 
 ---
 
+## Keywords file (optional) — tune the HARD/SOFT lists without a full config
+
+Sometimes all you want to change is which modal words count as binding ("hard") vs advisory ("soft"). Authoring a whole `--config` for that is overkill, so the tool also accepts a **standalone keywords file** via `--keywords PATH` (CLI) or the "Keywords" field in the GUI. `.yaml`, `.yml`, `.txt`, and `.kw` extensions are all accepted.
+
+Two schemas are supported — mix them across buckets freely, but don't combine the "replace" and "tweak" forms for the *same* bucket:
+
+**Tweak the built-ins (most common):**
+
+```yaml
+hard_add:    [is to, are to]    # extra hard keywords beyond the defaults
+hard_remove: [will]             # drop noisy hard matches
+soft_add:    [anticipated, expected to]
+soft_remove: []
+```
+
+The built-in HARD list is `shall`, `must`, `required`, `mandatory`. The built-in SOFT list is `should`, `may`, `might`, `can`, `could`, `will`, `recommended`, `preferred`, `ought to`.
+
+**Replace a bucket wholesale** (for house styles narrower than the defaults):
+
+```yaml
+hard: [shall, must]
+soft: [should, may]
+```
+
+Anything not listed collapses to "not a requirement". Mixing `hard` with `hard_add`/`hard_remove` in the same file is rejected with a clear error since the two intents contradict each other.
+
+The text format (`.txt` / `.kw`) uses `[section]` markers for non-YAML users:
+
+```
+[hard_add]
+is to
+are to
+[hard_remove]
+will
+```
+
+A fully-commented example lives at `samples/sample_keywords.yaml`. The keywords file layers *on top of* `--config` if both are provided; a per-doc `<stem>.reqx.yaml` still wins over both.
+
+---
+
 ## Statement-set CSV (optional second output)
 
-The Excel workbook is the primary output, but the tool can *also* export the extracted content to a "statement set" CSV matching a specific paired-column template (`Level 1, Description 1, Level 2, Description 2, …`). Each row fills exactly one `(Level N, Description N)` pair and leaves the others blank, so the file opens as a pre-order-flattened hierarchy:
+The Excel workbook is the primary output, but the tool can *also* export the extracted content to a "statement set" CSV matching a specific paired-column template (`Level 1, Description 1, Level 2, Description 2, …`). Each row fills exactly one `(Level N, Description N)` pair and leaves the others blank, so the file opens as a pre-order-flattened hierarchy.
 
-| Level     | What it is                                                                                  | Example                                     |
-|-----------|---------------------------------------------------------------------------------------------|---------------------------------------------|
-| Level 1   | Top document heading (most recent Heading 1 above the section).                             | `System Requirements`                       |
-| Level 2   | Section-style row from the 2-col table — title in Level 2, intro paragraph in Description 2. | `3.1 Authentication` / `Access control is…` |
-| Level 3   | One row per requirement. `Level 3` = `"<Actor> <N>"`; `Description 3` = `"<Actor>\n\n<text>"`. | `Auth Service 1` / `Auth Service\n\nThe Auth Service shall…` |
+The writer maps your document structure onto paired columns like this:
 
-A table row is treated as a **section** (Level 2) when its first-column text starts with a numeric prefix like `3.1 …` or `3.1.2 …`. Anything else is treated as an **actor** row, and its requirements become Level 3 children of the most recent section. The `Level 3` counter restarts per `(section, actor)` pair, so you get `Auth Service 1…6` under `3.1 Authentication`, then `Flight Software 1…3` and `Ground Control 1…2` under `3.2 Telemetry`, and so on.
+| Level     | What it is                                                                                  |
+|-----------|---------------------------------------------------------------------------------------------|
+| Level 1   | Most recent **Heading 1** above the section.                                                |
+| Level 2   | Most recent **Heading 2** — or, if the doc has no H2, a section-style row from the 2-col table that sits directly under an H1. |
+| Level 3   | Most recent **Heading 3** (when H2 is also present) — or a section-style 2-col-table row (when an H2 was seen) — or the requirement itself (degenerate case). |
+| Level 4+  | Deeper structure and the requirement row as the document demands.                           |
+
+A table row is treated as a **section** when its first-column text starts with a recognised prefix like `3.1 …` or `3.1.2 …` (see the `tables.section_prefix` regex in the config docs). Anything else is treated as an **actor** row, and its requirements become children one level below the deepest structural anchor. The requirement's level counter restarts per `(section_scope, actor)` pair, so you get `Auth Service 1…6` under `3.1 Authentication`, then `Flight Software 1…3` and `Ground Control 1…2` under `3.2 Telemetry`, and so on.
 
 Enable the export:
 
@@ -294,8 +356,9 @@ Enable the export:
 
 Notes on the statement-set output:
 
-- Preamble prose (content before the document's first Heading 1) is *not* exported to the statement set — it's rarely a real requirement. Those rows still appear in the Excel workbook for review.
-- The header includes the final `Level #, Description #` placeholder pair to match the template exactly. If your docs ever nest deeper than four levels, raise `_MAX_LEVEL` in `requirements_extractor/statement_set.py`.
+- **Preamble prose** (content before any recognised section / heading) is now routed into a synthetic `(preamble)` Level-2 bucket rather than being dropped, so every extracted requirement still reaches the CSV. Review those rows and promote them into a real section as part of your workflow. Requirements that have *no* structural context at all (a document with no H1, no H2, no section rows) also land under `(preamble)` so nothing is silently lost.
+- **H2/H3 plumbing**: if your spec uses Heading 2 / Heading 3 as structure (instead of only H1 + table sections), the writer now respects that — H2 lands at L2, H3 at L3. If the document skips H2 and goes straight to H3, the H3 is emitted at L2 directly rather than inventing a missing level.
+- The header row spans five `Level N / Description N` pairs plus a final `Level # / Description #` placeholder pair to match the template exactly. The requirement level is clamped at five so a runaway nesting doesn't blow past the template width.
 - Text is preserved faithfully from the source. If your H1 is literally `3. System Requirements`, that's what appears at Level 1 — the tool doesn't strip numeric prefixes.
 
 ## Output workbook
