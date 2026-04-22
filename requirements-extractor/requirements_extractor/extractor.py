@@ -8,7 +8,12 @@ from typing import Callable, List, Optional, Sequence, Tuple
 
 from .actors import ActorResolver, load_actors_from_xlsx
 from .config import Config, resolve_config
-from .models import ExtractionStats, Requirement, RequirementEvent
+from .models import (
+    ExtractionStats,
+    Requirement,
+    RequirementEvent,
+    ensure_unique_stable_ids,
+)
 from .parser import parse_docx_events
 from .statement_set import write_statement_set
 from .writer import write_requirements
@@ -20,6 +25,7 @@ class ExtractionResult:
     stats: ExtractionStats
     output_path: Optional[Path] = None
     statement_set_path: Optional[Path] = None
+    dry_run: bool = False
 
 
 class ExtractionCancelled(RuntimeError):
@@ -43,6 +49,7 @@ def extract_from_files(
     progress: Optional[Callable[[str], None]] = None,
     file_progress: Optional[Callable[[int, int, str], None]] = None,
     cancel_check: Optional[Callable[[], bool]] = None,
+    dry_run: bool = False,
 ) -> ExtractionResult:
     """Parse every .docx in `input_paths` and write results.
 
@@ -62,6 +69,13 @@ def extract_from_files(
     ``cancel_check()`` is polled before each file.  If it returns True
     the run aborts and :class:`ExtractionCancelled` is raised before any
     output is written.
+
+    ``dry_run=True`` runs the full parse pipeline (including stable-ID
+    assignment) but skips both the Excel and statement-set writes.  The
+    returned :class:`ExtractionResult` still contains the in-memory
+    requirements list so callers can display counts or sample rows.  The
+    ``output_path`` / ``statement_set_path`` fields on the result are
+    left as ``None`` in a dry run to make "no file was created" obvious.
     """
 
     stats = ExtractionStats()
@@ -155,6 +169,21 @@ def extract_from_files(
     stats.requirements_found = len(all_reqs)
     stats.hard_count = sum(1 for r in all_reqs if r.req_type == "Hard")
     stats.soft_count = sum(1 for r in all_reqs if r.req_type == "Soft")
+
+    # Assign unique stable IDs before any writer sees the list so every
+    # output consumer gets the same values.  Duplicate (file, actor, text)
+    # rows get ``-1``/``-2`` suffixes in first-seen order.
+    ensure_unique_stable_ids(all_reqs)
+
+    if dry_run:
+        log(f"Dry run: parsed {len(all_reqs)} requirements; no files written.")
+        return ExtractionResult(
+            requirements=all_reqs,
+            stats=stats,
+            output_path=None,
+            statement_set_path=None,
+            dry_run=True,
+        )
 
     output_path = Path(output_path)
     write_requirements(all_reqs, output_path)

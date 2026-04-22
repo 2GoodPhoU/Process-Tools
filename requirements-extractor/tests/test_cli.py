@@ -74,6 +74,9 @@ class TestRequirementsSubcommand(unittest.TestCase):
         self.assertIsNone(args.actors)
         self.assertFalse(args.nlp)
         self.assertIsNone(args.statement_set)
+        # Defaults for the newer quality-of-life flags.
+        self.assertFalse(args.dry_run)
+        self.assertEqual(args.show_samples, 0)
 
     def test_alias_reqs(self) -> None:
         args = build_parser().parse_args(["reqs", "spec.docx"])
@@ -87,12 +90,16 @@ class TestRequirementsSubcommand(unittest.TestCase):
             "--actors", "actors.xlsx",
             "--nlp",
             "--statement-set", "ss.csv",
+            "--dry-run",
+            "--show-samples", "5",
         ])
         self.assertEqual(args.inputs, [Path("folder/"), Path("other.docx")])
         self.assertEqual(args.output, Path("out.xlsx"))
         self.assertEqual(args.actors, Path("actors.xlsx"))
         self.assertTrue(args.nlp)
         self.assertEqual(args.statement_set, Path("ss.csv"))
+        self.assertTrue(args.dry_run)
+        self.assertEqual(args.show_samples, 5)
 
     def test_requires_input(self) -> None:
         parser = build_parser()

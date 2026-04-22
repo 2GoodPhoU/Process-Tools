@@ -155,6 +155,27 @@ def build_parser() -> argparse.ArgumentParser:
             "(Level N, Description N) hierarchical format."
         ),
     )
+    p_req.add_argument(
+        "--dry-run",
+        dest="dry_run",
+        action="store_true",
+        help=(
+            "Parse and detect as usual, but do NOT write any Excel or CSV "
+            "output.  Useful for previewing counts, iterating on config, "
+            "or verifying a new corpus without overwriting prior results."
+        ),
+    )
+    p_req.add_argument(
+        "--show-samples",
+        dest="show_samples",
+        type=int,
+        default=0,
+        metavar="N",
+        help=(
+            "Print the first N detected requirements as part of the "
+            "summary.  Pairs well with --dry-run for quick sanity checks."
+        ),
+    )
 
     # actors ------------------------------------------------------------- #
     p_actors = sub.add_parser(
@@ -234,18 +255,25 @@ def _run_requirements(
     args, inputs: List[Path], progress, summary,
 ) -> int:
     """Requirements-mode dispatch."""
+    dry_run = bool(getattr(args, "dry_run", False))
+    show_samples = int(getattr(args, "show_samples", 0) or 0)
+
+    # When dry-running we don't touch disk, but extract_from_files still
+    # wants an output_path — pass the default so error messages make sense
+    # if dry_run=False is reintroduced via code-path reuse elsewhere.
     output_path = args.output or Path("requirements.xlsx")
     result = extract_from_files(
         input_paths=inputs,
         output_path=output_path,
         actors_xlsx=args.actors,
         use_nlp=args.nlp,
-        statement_set_path=args.statement_set,
+        statement_set_path=None if dry_run else args.statement_set,
         config_path=args.config,
         progress=progress,
+        dry_run=dry_run,
     )
     summary("")
-    summary("==== Summary ====")
+    summary("==== Summary ====" + ("  [dry run — no files written]" if dry_run else ""))
     summary(f"Files processed:      {result.stats.files_processed}")
     summary(f"Requirements found:   {result.stats.requirements_found}")
     summary(f"  Hard:               {result.stats.hard_count}")
@@ -254,9 +282,21 @@ def _run_requirements(
         summary(f"Warnings/Errors:      {len(result.stats.errors)}")
         for err in result.stats.errors:
             summary(f"  - {err}")
-    summary(f"Output:               {result.output_path}")
+    if result.output_path is not None:
+        summary(f"Output:               {result.output_path}")
     if result.statement_set_path is not None:
         summary(f"Statement-set CSV:    {result.statement_set_path}")
+    if dry_run and args.statement_set is not None:
+        summary(f"Statement-set CSV:    (skipped — dry run) {args.statement_set}")
+
+    if show_samples > 0 and result.requirements:
+        summary("")
+        summary(f"First {min(show_samples, len(result.requirements))} sample(s):")
+        for req in result.requirements[:show_samples]:
+            # One-line preview; truncate long requirement text so the
+            # terminal doesn't wrap aggressively.
+            text = req.text if len(req.text) <= 110 else req.text[:107] + "..."
+            summary(f"  {req.stable_id}  [{req.req_type}] {req.primary_actor}: {text}")
     return 0
 
 

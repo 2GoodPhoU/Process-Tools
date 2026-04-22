@@ -50,6 +50,7 @@ from .models import (
     Requirement,
     RequirementEvent,
     SectionRowEvent,
+    compute_stable_id,
 )
 
 Event = Union[HeadingEvent, SectionRowEvent, RequirementEvent]
@@ -230,6 +231,7 @@ def _emit_candidate(
         confidence=confidence,
         notes=notes,
         polarity=polarity,
+        stable_id=compute_stable_id(ctx.source_file, primary_actor, text),
     )
 
 

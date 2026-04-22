@@ -40,7 +40,7 @@ The **Today, small** batch plus a **configurable file-format parser** have been 
 - **Actor-only scan mode** (new capability, complements §1.7 in practice) — ✅ FIXED. A dedicated ``actors`` / ``scan`` CLI subcommand and an **Actors** mode in the GUI run the parser without keyword detection and emit a three-sheet workbook (Actors / Observations / Readme). The Actors sheet's header shape (``Actor`` / ``Aliases``) is directly consumable by ``--actors`` on a subsequent run, so users can bootstrap and iterate on an actors list cheaply. Seeded re-scans preserve canonical spellings verbatim and add only new variants as aliases. Covered by ``tests/test_actor_scan.py`` (23 tests: normalisation, grouping seeded/unseeded, end-to-end round-trip through ``load_actors_from_xlsx``, cancel/progress plumbing).
 - **Subcommand CLI + surface rename to `document-data-extractor`** — ✅ FIXED. The tool now presents as ``document-data-extractor`` (window title, packaging spec, README branding) to reflect that it does more than just requirements.  The CLI is git-style: ``document-data-extractor requirements SPECS/`` and ``document-data-extractor actors SPECS/`` (with ``reqs`` / ``scan`` aliases).  Global flags (``--config``, ``-q/--quiet``, ``--no-summary``) live on the root parser.  The legacy ``extract.py`` shim transparently rewrites flag-style argv to a ``requirements`` subcommand so older scripts keep working.  GUI exposes the mode as a top-of-window radio selector; the statement-set section greys out in actors mode; the chosen mode is persisted in ``GuiSettings`` and restored on next launch.  The Python package remains ``requirements_extractor`` internally so existing imports don't break.  Covered by ``tests/test_cli.py`` (23 tests: parser shape, per-subcommand flag parsing, alias passthrough, end-to-end dispatch, shim argv rewriting) plus ``TestGuiSettingsMode`` in ``tests/test_gui_state.py``.
 
-Still open (carried into the roadmap below): §1.3, §1.6, §1.7, §1.9, §1.10, §2.4, §2.7, §2.8, §2.9, §2.13, §2.14, §3.1, §3.2 (beyond keyword tuning), §3.3, §3.8, §3.9, §3.10, §3.11, §3.12, §3.13, §3.15.
+Still open (carried into the roadmap below): §1.3, §1.6, §1.7, §1.9, §1.10, §2.4, §2.7, §2.8, §2.9, §2.13, §2.14, §3.1, §3.2 (beyond keyword tuning), §3.8, §3.9, §3.10, §3.12, §3.13, §3.15.
 
 ---
 
@@ -153,8 +153,8 @@ All output is raw `print`. Switch the progress callback internals to `logging.ge
 ### 3.2 Editable keyword lists without code changes — MEDIUM
 `detector.py` holds the word lists in code. For a non-technical audience, let them live as an editable YAML/TXT next to the exe (or in `%APPDATA%` / `~/.config`), with fallbacks to defaults. `--keywords path.yaml` on the CLI and a "Keywords…" button in the GUI would make per-project tuning possible without rebuilds.
 
-### 3.3 Dry-run / preview mode — MEDIUM
-A `--dry-run` that just prints the counts (total, hard, soft) without writing the xlsx would let users iterate on keywords. Pair it with `--show-samples N` to print a handful of matches.
+### 3.3 Dry-run / preview mode — MEDIUM — ✅ FIXED
+`requirements --dry-run` runs the full parse + detect + ID-assignment pipeline and prints the usual summary, but skips writing both the Excel workbook and any `--statement-set` CSV. `--show-samples N` additionally prints the first N detected requirements (stable ID, type, primary actor, text preview) so users can eyeball what was matched before spending disk on it. Plumbed through as a `dry_run` kwarg on `extract_from_files`; existing callers (GUI, legacy tests) pick up the default `False` without change. Covered by `TestDryRunEndToEnd` (extractor-level) and `TestDryRunCLI` (argparse wiring + end-to-end `main()` invocation) in `tests/test_stable_ids.py`, plus updated flag coverage in `tests/test_cli.py`.
 
 ### 3.4 Progress bar in GUI — LOW — ✅ FIXED
 A `ttk.Progressbar` in determinate mode now lives below the Run/Cancel row, advanced per-file via the new `file_progress(i, n, name)` callback the extractor emits. The status label alongside shows `"Parsing i/n: <filename>"`.
@@ -184,8 +184,8 @@ Common requests once a team has this running:
 
 Each is a 50-line writer; the event stream already exposes enough to build them.
 
-### 3.11 Stable requirement IDs — MEDIUM
-The `#` column is appearance-order. If the user runs the tool again after adding a paragraph upstream, every downstream ID shifts, which makes diffing across runs painful. Add a stable ID derived from `(source_file, row_ref, block_ref, text_hash[:8])`, kept alongside `#`.
+### 3.11 Stable requirement IDs — MEDIUM — ✅ FIXED
+Every requirement now gets a `REQ-<8hex>` identifier written to a new **ID** column (column 2, right after `#`). The hash inputs are `(source_file, primary_actor, text)` — whitespace-collapsed and case-folded first so cosmetic reformatting doesn't churn IDs. Row/block/heading references and global appearance order are *deliberately excluded* so inserting an unrelated paragraph upstream does not renumber downstream IDs. Duplicate `(file, actor, text)` rows in a single corpus get `-1`, `-2`, … suffixes in first-seen order via `ensure_unique_stable_ids()`, preserving the shared prefix for `grep`. The ID is computed in `parser.py::_emit_candidate` and finalised in `extractor.py` just before writers run, so every output consumer sees the same values. Decision log: the original §3.11 sketch suggested including `row_ref`/`block_ref` in the hash — that was dropped because it makes IDs brittle under exactly the upstream edits this feature is meant to survive. Covered by `TestComputeStableId`, `TestEnsureUniqueStableIds`, and `TestWriterIdColumn` in `tests/test_stable_ids.py` (format check, determinism, whitespace/case normalisation, collision suffixing, xlsx column placement, cross-run stability).
 
 ### 3.12 Diff mode — LOW
 `requirements-extractor diff old.xlsx new.xlsx` that colour-codes added/removed/changed rows in a third workbook would be a killer feature for change-control meetings.
@@ -210,8 +210,8 @@ Non-technical users often struggle to get the actors file started. A "Download a
 If you want a concrete roadmap:
 
 1. **Today, small**: fix §2.1 (duplicate column), §2.2 (dead property), §2.3 (unused imports), §2.5 (quiet+summary), §2.6 (`_MAX_LEVEL` doc).
-2. **This week**: §1.1 and §1.2 (high-signal detector fixes), §2.12 (add pytest + 10 golden tests so you can safely refactor the detector), §1.4 (negation), §3.3 (`--dry-run`).
-3. **Next**: §1.3 (sentence splitter), §1.5 (alphanumeric sections), §3.2 (external keyword file), §3.11 (stable IDs), §3.9 (statement-set heading-style option).
+2. **This week**: §1.1 and §1.2 (high-signal detector fixes), §2.12 (add pytest + 10 golden tests so you can safely refactor the detector), §1.4 (negation), §3.3 (`--dry-run`). *(All done.)*
+3. **Next**: §1.3 (sentence splitter), §1.5 (alphanumeric sections), §3.2 (external keyword file), §3.11 (stable IDs — done), §3.9 (statement-set heading-style option).
 4. **Nice-to-have**: §3.5–3.7 (GUI polish), §3.1 (.doc support), §3.10 (extra output formats), §3.12 (diff mode).
 
 Items §1.1, §1.2, §2.1, and §2.5 are all one-liners or near-one-liners and would materially improve the user-facing quality right away.

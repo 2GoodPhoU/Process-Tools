@@ -145,6 +145,10 @@ python extract.py requirements spec.docx -o out.xlsx --nlp
 # Also export a statement-set CSV (hierarchical paired-level format)
 python extract.py requirements spec.docx -o out.xlsx --statement-set statement_set.csv
 
+# Dry-run — parse and count without writing anything, great for
+# iterating on a config or previewing a new corpus
+python extract.py requirements spec.docx --dry-run --show-samples 5
+
 # Actors mode — build an actors list from a corpus instead of
 # extracting requirements.  Output round-trips into --actors.
 python extract.py actors C:\Projects\Specs -o actors_scan.xlsx
@@ -303,6 +307,7 @@ Two sheets:
 | Column           | What it is                                                                                  |
 |------------------|---------------------------------------------------------------------------------------------|
 | #                | Global order of appearance across all processed docs.                                       |
+| ID               | Stable requirement identifier (`REQ-<8hex>`) — survives unrelated upstream churn. See "Stable requirement IDs" below. |
 | Source File      | The document filename.                                                                      |
 | Heading Trail    | Nearest H1 > H2 > H3 above the requirement.                                                 |
 | Section / Topic  | Text from column 1 of the 2-column table row.                                               |
@@ -320,6 +325,28 @@ Two sheets:
 **Summary** — quick totals and a breakdown by primary actor.
 
 The header row is frozen, autofilters are enabled, soft rows are shaded yellow, and negative (prohibition) rows are shaded light red so both categories are easy to batch-review. A negative-polarity soft row is still shown red — prohibitions take priority because missing one is higher-risk than missing an advisory.
+
+---
+
+## Stable requirement IDs
+
+Every requirement gets a stable `REQ-<8hex>` identifier (column **ID** in the workbook). It's derived from three fields that define the requirement's identity: the source filename, the primary actor, and the requirement text itself (whitespace-collapsed and case-folded first, so cosmetic reformatting doesn't churn the ID). Inserting a paragraph upstream, re-numbering a section, or renaming a table won't change anyone's ID — the three inputs are unchanged.
+
+If two rows somehow end up with identical `(file, actor, text)` — real corpora do have duplicated boilerplate — the second and later occurrences get a numeric suffix (`REQ-abc12345-1`, `REQ-abc12345-2`) in first-seen order so every row still has a unique handle while the shared prefix stays greppable.
+
+The ID is only meant for cross-document referencing in reviews and change-tracking; it's intentionally not a global registry. If you rename the source file or edit the requirement's wording, the ID changes — that's working as intended (the two versions really are different requirements).
+
+---
+
+## Dry run
+
+`--dry-run` on a requirements invocation runs the full parse + detect + ID-assignment pipeline and prints the usual summary, but skips writing the Excel workbook and any statement-set CSV. It pairs well with `--show-samples N`, which prints the first N detected requirements as a one-line preview:
+
+```
+python extract.py requirements spec.docx --dry-run --show-samples 5
+```
+
+Use it when you're iterating on a YAML config, evaluating a new corpus, or just want to know how many requirements a new file will produce before you overwrite a previous result.
 
 ---
 

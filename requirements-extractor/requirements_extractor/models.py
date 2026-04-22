@@ -2,8 +2,77 @@
 
 from __future__ import annotations
 
+import hashlib
+import re
 from dataclasses import dataclass, field
 from typing import List
+
+
+# ---------------------------------------------------------------------------
+# Stable-ID helpers.
+#
+# The goal: a short, human-quotable identifier that stays the same across
+# runs *as long as the underlying requirement hasn't meaningfully changed*.
+# Meaningful change is defined narrowly as: the source filename, the
+# primary actor, or the requirement sentence itself.
+#
+# Deliberately NOT in the hash: table/row/block refs, heading trail,
+# appearance order.  If we included those, inserting an unrelated
+# paragraph upstream would renumber everything — defeating the point.
+#
+# Format is ``REQ-<8 hex chars>``.  At ~10k requirements across a corpus
+# the birthday-collision probability is ≈0.001%, low enough to be a
+# non-issue; a true collision is disambiguated with a numeric suffix
+# (see ``Requirement.ensure_unique_stable_ids``).
+# ---------------------------------------------------------------------------
+
+
+_WHITESPACE_RUN = re.compile(r"\s+")
+_STABLE_ID_PREFIX = "REQ-"
+_STABLE_ID_HEX_LEN = 8
+
+
+def _normalise_for_hash(value: str) -> str:
+    """Collapse whitespace and casefold — so cosmetic reformatting
+    (double spaces → single, capitalisation of an actor name) doesn't
+    churn the ID."""
+    return _WHITESPACE_RUN.sub(" ", value.strip()).casefold()
+
+
+def compute_stable_id(source_file: str, primary_actor: str, text: str) -> str:
+    """Return a stable ``REQ-<8hex>`` identifier for a requirement.
+
+    Pure function — takes the three identity-defining inputs and returns
+    a deterministic ID.  Callers that need collision handling should use
+    :func:`ensure_unique_stable_ids` on the full list.
+    """
+    blob = "\x1f".join(
+        _normalise_for_hash(part) for part in (source_file, primary_actor, text)
+    )
+    digest = hashlib.sha1(blob.encode("utf-8")).hexdigest()
+    return f"{_STABLE_ID_PREFIX}{digest[:_STABLE_ID_HEX_LEN]}"
+
+
+def ensure_unique_stable_ids(requirements: List["Requirement"]) -> None:
+    """In-place disambiguation of colliding stable IDs.
+
+    SHA1 collisions on three-field inputs are astronomically unlikely,
+    but *duplicate rows* (two requirements with identical file, actor,
+    and text) do happen in real corpora — the same boilerplate shared
+    across sections, copy-paste mistakes, etc.  For those, we append
+    ``-1``, ``-2``, … to the later occurrences in first-seen order so
+    each row still has a unique handle while the shared prefix stays
+    greppable.
+    """
+    seen: dict[str, int] = {}
+    for req in requirements:
+        base = req.stable_id
+        if not base:
+            continue
+        count = seen.get(base, 0)
+        if count > 0:
+            req.stable_id = f"{base}-{count}"
+        seen[base] = count + 1
 
 
 @dataclass
@@ -24,6 +93,7 @@ class Requirement:
     confidence: str                     # "High" | "Medium" | "Low"
     notes: str = ""                     # free-text flags for reviewers
     polarity: str = "Positive"          # "Positive" | "Negative" (shall-not etc.)
+    stable_id: str = ""                 # "REQ-<8hex>" — survives upstream content churn
 
     @property
     def secondary_actors_str(self) -> str:

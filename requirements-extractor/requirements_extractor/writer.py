@@ -13,6 +13,7 @@ from .models import Requirement
 
 COLUMNS = [
     ("#", 6),
+    ("ID", 14),
     ("Source File", 28),
     ("Heading Trail", 30),
     ("Section / Topic", 22),
@@ -62,6 +63,7 @@ def write_requirements(
     for row_idx, req in enumerate(requirements, start=2):
         values = [
             req.order,
+            req.stable_id,
             req.source_file,
             req.heading_trail,
             req.section_topic,
