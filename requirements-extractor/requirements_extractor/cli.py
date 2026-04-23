@@ -96,6 +96,23 @@ Examples:
 
 
 # ---------------------------------------------------------------------------
+# Subcommand catalogue.
+# ---------------------------------------------------------------------------
+#
+# Single source of truth for the names the parser accepts, kept next to
+# the argparse wiring.  The ``extract.py`` backward-compat shim imports
+# this set so it doesn't drift when we add or rename a subcommand.
+SUBCOMMAND_NAMES = frozenset({
+    # canonical names
+    "requirements",
+    "actors",
+    # aliases — keep in sync with ``aliases=[...]`` on each add_parser call
+    "reqs",
+    "scan",
+})
+
+
+# ---------------------------------------------------------------------------
 # Helpers.
 # ---------------------------------------------------------------------------
 
@@ -382,6 +399,32 @@ def main(argv: Optional[List[str]] = None) -> int:
     return EXIT_USAGE
 
 
+def _harvest_auto_actors(
+    args,
+    inputs: List[Path],
+    output_path: Path,
+    progress,
+) -> Path:
+    """Run the actor scan as a pre-pass and return the harvested xlsx path.
+
+    Called only when ``--auto-actors`` is set.  Seeds with any explicit
+    ``--actors`` file so the user's curated list survives verbatim into
+    the sidecar that the requirements pass will consume.
+    """
+    auto_path = output_path.with_name(f"{output_path.stem}_auto_actors.xlsx")
+    progress(f"Auto-actors: harvesting to {auto_path.name} ...")
+    scan_result = scan_actors_from_files(
+        input_paths=inputs,
+        output_path=auto_path,
+        seed_actors_xlsx=args.actors,
+        use_nlp=args.nlp,
+        config_path=args.config,
+        keywords_path=args.keywords,
+        progress=progress,
+    )
+    return scan_result.output_path
+
+
 def _run_requirements(
     args, inputs: List[Path], progress, summary,
 ) -> int:
@@ -397,23 +440,7 @@ def _run_requirements(
 
     effective_actors: Optional[Path] = args.actors
     if auto_actors:
-        # Harvest actors first and use the resulting .xlsx as the actors
-        # source for the requirements run.  Writes a sidecar so the user
-        # can inspect / tidy / reuse the harvested list.
-        auto_path = output_path.with_name(
-            f"{output_path.stem}_auto_actors.xlsx"
-        )
-        progress(f"Auto-actors: harvesting to {auto_path.name} ...")
-        scan_result = scan_actors_from_files(
-            input_paths=inputs,
-            output_path=auto_path,
-            seed_actors_xlsx=args.actors,
-            use_nlp=args.nlp,
-            config_path=args.config,
-            keywords_path=args.keywords,
-            progress=progress,
-        )
-        effective_actors = scan_result.output_path
+        effective_actors = _harvest_auto_actors(args, inputs, output_path, progress)
 
     result = extract_from_files(
         input_paths=inputs,

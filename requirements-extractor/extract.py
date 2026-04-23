@@ -13,11 +13,11 @@ from __future__ import annotations
 
 import sys
 
-from requirements_extractor.cli import main
+from requirements_extractor.cli import SUBCOMMAND_NAMES, main
 
-# Subcommand names (and aliases) that main() understands.  Kept in sync
-# with requirements_extractor.cli.build_parser.
-_KNOWN_SUBCOMMANDS = {"requirements", "reqs", "actors", "scan"}
+# Subcommand names (and aliases) that main() understands — imported from
+# cli.py so this shim automatically picks up new subcommands.
+_KNOWN_SUBCOMMANDS = SUBCOMMAND_NAMES
 # Top-level flags that may appear before a subcommand.  If we see one
 # of these, we scan past it to check whether a subcommand follows.
 _GLOBAL_FLAGS_WITH_VALUE = {"--config", "--keywords"}

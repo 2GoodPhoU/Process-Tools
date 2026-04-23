@@ -1,4 +1,29 @@
 # Tools needed to produce a frozen executable.
 # Install into your build venv:
 #     pip install -r packaging/build-requirements.txt
-pyinstaller>=6.0
+#
+# Note on the NLP stack (§2.14):
+#
+# The PyInstaller spec at `DocumentDataExtractor.spec` bundles spaCy and
+# its pydantic dependency graph so the "Use NLP" mode works out of the
+# box.  spaCy's pydantic version requirement has flipped between v1 and
+# v2 across minor releases; bundling a mismatched pair has historically
+# caused `ValidationError`s that only surface on the target machine.
+#
+# The pins below match the combination validated with the current spaCy
+# ecosystem (spaCy 3.7 expects pydantic 1.x OR 2.x depending on the
+# minor; pydantic-core is pinned to a 2.x pair that aligns with pydantic
+# 2.x).  If you bump `spacy` here, double-check that pydantic and
+# pydantic-core still line up with what spaCy declares in its metadata,
+# or the frozen exe will fail at runtime with a pydantic import error.
+
+pyinstaller>=6.0,<7
+
+# --- NLP stack (optional but recommended for bundling) ----------------
+# Uncomment / install alongside if you're producing an NLP-enabled build.
+# (These aren't required for a CLI-only or non-NLP GUI build.)
+#
+# spacy>=3.7,<3.8
+# pydantic>=2.5,<3
+# pydantic-core>=2.14,<3
+# thinc>=8.2,<9

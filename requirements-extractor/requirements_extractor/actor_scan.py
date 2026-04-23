@@ -48,6 +48,7 @@ from docx import Document
 from docx.table import Table
 from docx.text.paragraph import Paragraph
 
+from ._logging import make_progress_logger
 from .actors import ActorEntry, ActorResolver, load_actors_from_xlsx
 from .config import Config, resolve_config
 from .parser import (
@@ -243,41 +244,10 @@ def _resolver_hits(
 ) -> List[Tuple[str, str]]:
     """Return (name, source) pairs, where source is 'regex' or 'nlp'.
 
-    ``ActorResolver.resolve`` mushes the two together; for scanning we
-    want the attribution, so we re-walk the same passes here.  This uses
-    the resolver's pre-built alias regex to stay consistent.
+    Thin wrapper over :meth:`ActorResolver.iter_matches` so that the
+    grouping code can enrich each observation with its discovery source.
     """
-    hits: List[Tuple[str, str]] = []
-    if not text:
-        return hits
-    primary_lower = (primary or "").strip().lower()
-    seen: set[str] = set()
-
-    if resolver._actor_re is not None:  # noqa: SLF001 — internal re-use is fine
-        for m in resolver._actor_re.finditer(text):
-            canonical = resolver._alias_to_canonical[m.group(1).lower()]
-            key = canonical.lower()
-            if key == primary_lower or key in seen:
-                continue
-            seen.add(key)
-            hits.append((canonical, "regex"))
-
-    if resolver._nlp is not None:  # noqa: SLF001
-        try:
-            ner_doc = resolver._nlp(text)
-            for ent in ner_doc.ents:
-                if ent.label_ not in {"PERSON", "ORG", "NORP", "PRODUCT"}:
-                    continue
-                name = ent.text.strip()
-                key = name.lower()
-                if not name or key == primary_lower or key in seen:
-                    continue
-                seen.add(key)
-                hits.append((name, "nlp"))
-        except Exception:  # noqa: BLE001 — NER is best-effort
-            pass
-
-    return hits
+    return list(resolver.iter_matches(text, primary))
 
 
 # ---------------------------------------------------------------------------
@@ -591,7 +561,7 @@ def scan_actors_from_files(
     raises :class:`ActorScanCancelled`.
     """
     stats = ActorScanStats()
-    log = progress or (lambda msg: None)
+    log = make_progress_logger(progress)
 
     seed_entries: List[ActorEntry] = []
     if seed_actors_xlsx is not None:
@@ -601,12 +571,12 @@ def scan_actors_from_files(
                 f"Loaded {len(seed_entries)} seed actors from "
                 f"{Path(seed_actors_xlsx).name}."
             )
-        except Exception as e:  # noqa: BLE001
+        except (OSError, ValueError, KeyError) as e:
             stats.errors.append(f"Failed to load seed actors: {e}")
             log(f"WARNING: {stats.errors[-1]}")
 
     resolver = ActorResolver(actors=seed_entries, use_nlp=use_nlp)
-    if use_nlp and resolver._nlp is None:  # noqa: SLF001
+    if use_nlp and not resolver.has_nlp():
         stats.errors.append(
             "NLP requested but spaCy (with an English model) is not available. "
             "Install with:  pip install spacy  &&  python -m spacy download en_core_web_sm"
@@ -623,7 +593,7 @@ def scan_actors_from_files(
                 keywords_path=run_keywords_path,
             )
             log(f"Loaded run config: {run_config_path.name}")
-        except Exception as e:  # noqa: BLE001
+        except (OSError, ValueError, ImportError) as e:
             stats.errors.append(f"Failed to load config {run_config_path}: {e}")
             log(f"WARNING: {stats.errors[-1]}")
             run_config_path = None
@@ -635,7 +605,7 @@ def scan_actors_from_files(
                 keywords_path=run_keywords_path,
             )
             log(f"Loaded keywords file: {run_keywords_path.name}")
-        except Exception as e:  # noqa: BLE001
+        except (OSError, ValueError, ImportError) as e:
             stats.errors.append(
                 f"Failed to load keywords file {run_keywords_path}: {e}"
             )
@@ -671,7 +641,7 @@ def scan_actors_from_files(
                 docx_path=path,
                 keywords_path=run_keywords_path,
             )
-        except Exception as e:  # noqa: BLE001
+        except (OSError, ValueError, ImportError) as e:
             stats.errors.append(
                 f"Failed to load per-doc config for {path.name}: {e}"
             )
@@ -681,7 +651,7 @@ def scan_actors_from_files(
         log(f"Scanning {path.name} (config: {cfg.source}) ...")
         try:
             new_obs = _walk_one_doc(path, cfg, resolver)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:  # noqa: BLE001 — per-file: keep going on next doc
             stats.errors.append(f"Error scanning {path.name}: {e}")
             log(f"ERROR: {stats.errors[-1]}")
             continue

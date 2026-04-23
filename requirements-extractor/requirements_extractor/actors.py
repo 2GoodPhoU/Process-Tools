@@ -13,7 +13,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Sequence
+from typing import Iterator, List, Optional, Sequence, Tuple
 
 
 @dataclass
@@ -33,6 +33,9 @@ class ActorResolver:
     word-boundary matching against every known name/alias and returns a
     deduped list of canonical names.
     """
+
+    # Labels we treat as actor-ish when scanning NLP entities.
+    _NLP_ACTOR_LABELS = frozenset({"PERSON", "ORG", "NORP", "PRODUCT"})
 
     def __init__(
         self,
@@ -62,36 +65,85 @@ class ActorResolver:
         else:
             self._actor_re = None
 
-    def resolve(self, text: str, primary: str) -> List[str]:
-        found: List[str] = []
-        seen: set[str] = set()
+    # --- Public API -----------------------------------------------------
+
+    def has_nlp(self) -> bool:
+        """Return True if an NLP pipeline is loaded and available."""
+        return self._nlp is not None
+
+    def iter_regex_hits(
+        self, text: str, primary: str = "",
+    ) -> Iterator[str]:
+        """Yield canonical actor names found via alias-regex matching.
+
+        Honors ``primary`` (excluded) and internally dedupes.  Callers
+        wanting cross-source dedup should provide their own ``seen`` set
+        via :meth:`iter_matches`.
+        """
+        if self._actor_re is None or not text:
+            return
         primary_lower = (primary or "").strip().lower()
+        seen: set[str] = set()
+        for m in self._actor_re.finditer(text):
+            canonical = self._alias_to_canonical[m.group(1).lower()]
+            key = canonical.lower()
+            if key == primary_lower or key in seen:
+                continue
+            seen.add(key)
+            yield canonical
 
-        if self._actor_re is not None:
-            for m in self._actor_re.finditer(text):
-                canonical = self._alias_to_canonical[m.group(1).lower()]
-                key = canonical.lower()
-                if key == primary_lower or key in seen:
-                    continue
-                seen.add(key)
-                found.append(canonical)
+    def iter_nlp_hits(
+        self, text: str, primary: str = "",
+    ) -> Iterator[str]:
+        """Yield actor names found via NLP entity recognition.
 
-        if self._nlp is not None:
-            try:
-                doc = self._nlp(text)
-                for ent in doc.ents:
-                    if ent.label_ not in {"PERSON", "ORG", "NORP", "PRODUCT"}:
-                        continue
-                    name = ent.text.strip()
-                    key = name.lower()
-                    if not name or key == primary_lower or key in seen:
-                        continue
-                    seen.add(key)
-                    found.append(name)
-            except Exception:  # noqa: BLE001 — NLP is best-effort
-                pass
+        Returns nothing if NLP is unavailable or fails at runtime.
+        """
+        if self._nlp is None or not text:
+            return
+        primary_lower = (primary or "").strip().lower()
+        seen: set[str] = set()
+        try:
+            doc = self._nlp(text)
+        except Exception:  # noqa: BLE001 — NLP is best-effort
+            return
+        for ent in doc.ents:
+            if ent.label_ not in self._NLP_ACTOR_LABELS:
+                continue
+            name = ent.text.strip()
+            key = name.lower()
+            if not name or key == primary_lower or key in seen:
+                continue
+            seen.add(key)
+            yield name
 
-        return found
+    def iter_matches(
+        self, text: str, primary: str = "",
+    ) -> Iterator[Tuple[str, str]]:
+        """Yield (name, source) tuples across all enabled passes.
+
+        ``source`` is ``"regex"`` or ``"nlp"``.  Cross-source dedup is
+        enforced: the same canonical name (case-insensitive) is emitted
+        at most once regardless of which pass discovered it.
+        """
+        primary_lower = (primary or "").strip().lower()
+        seen: set[str] = set()
+        for name in self.iter_regex_hits(text, primary):
+            key = name.lower()
+            if key == primary_lower or key in seen:
+                continue
+            seen.add(key)
+            yield (name, "regex")
+        for name in self.iter_nlp_hits(text, primary):
+            key = name.lower()
+            if key == primary_lower or key in seen:
+                continue
+            seen.add(key)
+            yield (name, "nlp")
+
+    def resolve(self, text: str, primary: str) -> List[str]:
+        """Return a deduped list of secondary actor names found in ``text``."""
+        return [name for name, _ in self.iter_matches(text, primary)]
 
 
 def load_actors_from_xlsx(path: Path) -> List[ActorEntry]:
@@ -134,7 +186,14 @@ def load_actors_from_xlsx(path: Path) -> List[ActorEntry]:
 
 
 def _try_load_spacy():
-    """Return a loaded spaCy pipeline, or None if unavailable."""
+    """Return a loaded spaCy pipeline, or None if unavailable.
+
+    ``spacy.load`` can raise ``OSError`` (model directory missing),
+    ``ImportError`` (model package not installed), ``ValueError`` (old
+    model incompatible with installed spacy), or — in edge cases with
+    spaCy's pydantic-based config — ``TypeError`` when the pydantic major
+    version mismatches.  All four are "spaCy isn't usable, move on".
+    """
     try:
         import spacy  # type: ignore
     except ImportError:
@@ -142,6 +201,6 @@ def _try_load_spacy():
     for model in ("en_core_web_sm", "en_core_web_md", "en_core_web_lg"):
         try:
             return spacy.load(model)
-        except Exception:  # noqa: BLE001
+        except (ImportError, OSError, ValueError, TypeError):
             continue
     return None

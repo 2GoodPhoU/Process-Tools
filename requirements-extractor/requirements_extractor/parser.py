@@ -86,6 +86,40 @@ class _ParseContext:
 # ---------------------------------------------------------------------------
 
 
+def _cell_element(cell: _Cell):
+    """Return the underlying ``<w:tc>`` element for a table cell.
+
+    ``python-docx`` (>=1.0) does not expose an official public attribute
+    for this; ``_tc`` has been the de-facto API for years and is pinned
+    via ``python-docx>=1.1,<2`` in requirements.txt.  This helper tries
+    public-ish attributes first so the library can later add one without
+    us needing to chase it.
+    """
+    for attr in ("_tc", "_element", "element"):
+        elm = getattr(cell, attr, None)
+        if elm is not None:
+            return elm
+    raise AttributeError(
+        "Could not locate the underlying XML element for this docx cell; "
+        "python-docx may have changed its internal API."
+    )
+
+
+def _paragraph_element(p: Paragraph):
+    """Return the underlying ``<w:p>`` element for a paragraph.
+
+    Same encapsulation rationale as :func:`_cell_element`.
+    """
+    for attr in ("_p", "_element", "element"):
+        elm = getattr(p, attr, None)
+        if elm is not None:
+            return elm
+    raise AttributeError(
+        "Could not locate the underlying XML element for this docx paragraph; "
+        "python-docx may have changed its internal API."
+    )
+
+
 def iter_block_items(parent) -> Iterator[object]:
     """Yield Paragraph and Table objects from a parent in document order.
 
@@ -94,7 +128,7 @@ def iter_block_items(parent) -> Iterator[object]:
     if isinstance(parent, _Document):
         parent_elm = parent.element.body
     elif isinstance(parent, _Cell):
-        parent_elm = parent._tc
+        parent_elm = _cell_element(parent)
     else:
         parent_elm = getattr(parent, "_element", None) or getattr(parent, "element", None)
 
@@ -121,7 +155,7 @@ def _heading_level(p: Paragraph) -> Optional[int]:
 
 def _is_bullet(p: Paragraph) -> bool:
     """Best-effort bullet/numbering detection."""
-    pPr = p._p.find(qn("w:pPr"))
+    pPr = _paragraph_element(p).find(qn("w:pPr"))
     if pPr is None:
         return False
     numPr = pPr.find(qn("w:numPr"))
@@ -173,9 +207,20 @@ def _cell_intro_text(cell: _Cell) -> str:
 
 
 def _update_heading_trail(trail: List[str], level: int, text: str) -> None:
-    """Keep the trail at most ``level`` deep, then append the new heading."""
+    """Update the trail so index ``level - 1`` holds ``text``.
+
+    If the document skips levels (e.g. H1 → H3 with no intervening H2),
+    the missing slots are filled with empty strings so the depth of a
+    heading can always be recovered from its position in the list.
+    This keeps the "Heading Trail" column meaningful when skimming.
+    """
+    # Truncate anything at or below the incoming level — those sub-headings
+    # belong to a now-closed branch.
     while len(trail) >= level:
         trail.pop()
+    # Pad with empty strings for any skipped intermediate levels.
+    while len(trail) < level - 1:
+        trail.append("")
     trail.append(text)
 
 

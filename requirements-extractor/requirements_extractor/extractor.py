@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, List, Optional, Sequence, Tuple
 
+from ._logging import make_progress_logger
 from .actors import ActorResolver, load_actors_from_xlsx
 from .config import Config, resolve_config
 from .models import (
@@ -80,19 +81,22 @@ def extract_from_files(
     """
 
     stats = ExtractionStats()
-    log = progress or (lambda msg: None)
+    log = make_progress_logger(progress)
 
     actors = []
     if actors_xlsx is not None:
         try:
             actors = load_actors_from_xlsx(Path(actors_xlsx))
             log(f"Loaded {len(actors)} actors from {Path(actors_xlsx).name}.")
-        except Exception as e:  # noqa: BLE001
+        except (OSError, ValueError, KeyError) as e:
+            # OSError: file missing / permission / locked.  ValueError:
+            # bad header.  KeyError: header present but empty-but-required
+            # cell that openpyxl propagates.
             stats.errors.append(f"Failed to load actors file: {e}")
             log(f"WARNING: {stats.errors[-1]}")
 
     resolver = ActorResolver(actors=actors, use_nlp=use_nlp)
-    if use_nlp and resolver._nlp is None:
+    if use_nlp and not resolver.has_nlp():
         stats.errors.append(
             "NLP requested but spaCy (with an English model) is not available. "
             "Install with:  pip install spacy  &&  python -m spacy download en_core_web_sm"
@@ -111,7 +115,10 @@ def extract_from_files(
                 keywords_path=run_keywords_path,
             )
             log(f"Loaded run config: {run_config_path.name}")
-        except Exception as e:  # noqa: BLE001
+        except (OSError, ValueError, ImportError) as e:
+            # OSError covers FileNotFoundError/PermissionError.  ValueError
+            # covers YAML parse errors and schema validation in config.py.
+            # ImportError surfaces if PyYAML isn't installed for a .yaml file.
             stats.errors.append(f"Failed to load config {run_config_path}: {e}")
             log(f"WARNING: {stats.errors[-1]}")
             run_config_path = None
@@ -125,7 +132,7 @@ def extract_from_files(
                 keywords_path=run_keywords_path,
             )
             log(f"Loaded keywords file: {run_keywords_path.name}")
-        except Exception as e:  # noqa: BLE001
+        except (OSError, ValueError, ImportError) as e:
             stats.errors.append(
                 f"Failed to load keywords file {run_keywords_path}: {e}"
             )
@@ -163,7 +170,7 @@ def extract_from_files(
                 docx_path=path,
                 keywords_path=run_keywords_path,
             )
-        except Exception as e:  # noqa: BLE001
+        except (OSError, ValueError, ImportError) as e:
             stats.errors.append(
                 f"Failed to load per-doc config for {path.name}: {e}"
             )
@@ -175,7 +182,7 @@ def extract_from_files(
             events = parse_docx_events(
                 path, resolver_fn=resolver.resolve, config=cfg,
             )
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:  # noqa: BLE001 — per-file: keep going on next doc
             stats.errors.append(f"Error parsing {path.name}: {e}")
             log(f"ERROR: {stats.errors[-1]}")
             continue
