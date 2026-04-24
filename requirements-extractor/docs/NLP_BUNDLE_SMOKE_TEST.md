@@ -255,3 +255,93 @@ If any smoke test fails, don't ship — fix the issue on the dev
 machine, re-run the whole checklist. The bundle's value is entirely
 in the NLP path working; a build that doesn't load NLP is strictly
 worse than the CLI-only path Eric already has.
+
+
+---
+
+## Pre-flight checklist (sandbox-side, run on the dev machine before every build)
+
+The runbook above is the manual flow on the build machine.  This
+section is the cheap headless pass you can run **before** sitting down
+on the Windows box, to catch the failures that don't need a build to
+surface.  All commands run from `requirements-extractor/`.
+
+1. **Tests are green.**  `python3 -m unittest discover tests` —
+   should report `OK`.  A green suite isn't a guarantee the bundle
+   will work, but a red suite always means the bundle won't.
+
+2. **Source-tree modules match the spec's `hiddenimports`.**  When
+   we add a new module under `requirements_extractor/`, the
+   PyInstaller spec needs to know about it — particularly for modules
+   imported via dynamic dispatch (the `EXTRA_FORMAT_WRITERS`
+   registry, the `diff` subcommand routing, the JSON/MD shim
+   modules).  This one-liner flags any drift:
+
+   ```bash
+   diff <(ls requirements_extractor/*.py | xargs -n1 basename | grep -v __init__ | sed 's/\.py$//' | sort) \
+        <(grep -oP 'requirements_extractor\.\K[a-z_]+' packaging/DocumentDataExtractor.spec | sort -u)
+   ```
+
+   No output = in sync.  Any output = the spec needs an update
+   (add the missing module names to the `hiddenimports` list inside
+   the `Analysis(...)` block).  Same recipe catches the reverse case
+   too — a module deleted but still listed.
+
+3. **Optional-dep bundle list matches `requirements-optional.txt`.**
+   The second `for _pkg in (...)` block in the spec lists optional
+   GUI / input-format add-ons that we want baked into the exe
+   (`pdfplumber`, `pdfminer`, `tkinterdnd2`).  Cross-check:
+
+   ```bash
+   grep -oP '^(?!#)[a-z][a-z0-9_-]+' requirements-optional.txt | sort -u
+   ```
+
+   Anything in that list that's NOT in either of the spec's
+   `for _pkg in (...)` blocks is a candidate to add (or to leave
+   intentionally out — `spacy` lives in the first block, drag-and-drop
+   is in the second).
+
+4. **`build-requirements.txt` pins are still consistent with the
+   spaCy minor we're targeting.**  The pin block is:
+
+   ```
+   spacy>=3.7,<3.8
+   pydantic>=2.5,<3
+   pydantic-core>=2.14,<3
+   thinc>=8.2,<9
+   ```
+
+   Bumping `spacy` past `<3.8` means re-checking that pydantic and
+   pydantic-core still line up with what the new spaCy minor declares
+   in its metadata.  The model wheel URL in the README install
+   command must match the spaCy minor too — `en_core_web_sm-3.7.1`
+   pairs with spaCy 3.7.x.
+
+5. **`run_gui.py` is the entry point referenced by the spec.**
+   The spec hardcodes `["../run_gui.py"]` as `Analysis.scripts`.
+   If anyone renames the entry script, the spec needs to follow.
+
+6. **Smoke-import the spec file with Python's parser.**  Catches
+   any local edit that broke the spec's syntax.  A real PyInstaller
+   build would do this anyway, but failing here is much cheaper than
+   waiting for the Windows machine to fail it:
+
+   ```bash
+   python3 -c "import ast; ast.parse(open('packaging/DocumentDataExtractor.spec').read()); print('spec syntax OK')"
+   ```
+
+7. **End-to-end smoke through the CLI.**  This exercises the same
+   modules the bundled exe will exercise, just on the dev machine:
+
+   ```bash
+   python3 -m requirements_extractor.cli requirements \
+       samples/procedures/simple_two_actors.docx \
+       -o /tmp/preflight.xlsx --emit json,md,reqif
+   ```
+
+   Should produce four files under `/tmp/` and exit `0`.  If this
+   fails, the bundle will fail the same way — fix it here first.
+
+If all seven steps pass, the bundle is as ready as a sandbox-side
+check can make it.  Ship it to the Windows machine and follow the
+build/smoke procedure above.

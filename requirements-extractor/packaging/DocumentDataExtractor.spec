@@ -69,23 +69,51 @@ for _pkg in (
     _bundle(_pkg)
 
 
+# Optional input-format / GUI add-ons (REVIEW §3.1, §3.7).  Same
+# best-effort treatment as the NLP stack — bundled when installed in
+# the build venv, silently skipped when absent so a CLI-only build
+# isn't forced to drag them in.
+for _pkg in (
+    "pdfplumber",
+    "pdfminer",
+    "tkinterdnd2",
+):
+    _bundle(_pkg)
+
+
 a = Analysis(
     ["../run_gui.py"],
     pathex=[".."],
     binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports + [
+        # Top-level package + every public module under it.  Listing
+        # them explicitly is belt-and-braces over PyInstaller's static
+        # analysis — a few are imported via dynamic dispatch
+        # (EXTRA_FORMAT_WRITERS, the diff subcommand, the optional
+        # JSON/MD shims) which static analysis sometimes misses.
+        # Keep this list in sync with `requirements_extractor/*.py`.
         "requirements_extractor",
-        "requirements_extractor.gui",
-        "requirements_extractor.cli",
-        "requirements_extractor.extractor",
+        "requirements_extractor._logging",
         "requirements_extractor.actor_scan",
-        "requirements_extractor.parser",
-        "requirements_extractor.detector",
         "requirements_extractor.actors",
-        "requirements_extractor.writer",
-        "requirements_extractor.statement_set",
+        "requirements_extractor.cli",
+        "requirements_extractor.config",
+        "requirements_extractor.detector",
+        "requirements_extractor.diff",
+        "requirements_extractor.extractor",
+        "requirements_extractor.gui",
+        "requirements_extractor.gui_help",
+        "requirements_extractor.gui_state",
+        "requirements_extractor.json_writer",
+        "requirements_extractor.legacy_formats",
+        "requirements_extractor.md_writer",
         "requirements_extractor.models",
+        "requirements_extractor.parser",
+        "requirements_extractor.reqif_writer",
+        "requirements_extractor.statement_set",
+        "requirements_extractor.writer",
+        "requirements_extractor.writers_extra",
     ],
     hookspath=[],
     hooksconfig={},
