@@ -858,7 +858,18 @@ def parse_docx(
     *,
     config: Optional[Config] = None,
 ) -> List[Requirement]:
-    """Backward-compatible shim — returns only the requirement rows."""
+    """Parse a .docx and return just its Requirements (no structural events).
+
+    Convenience over :func:`parse_docx_events` for callers that only
+    want the requirement rows — most tests, the actor scanner's
+    per-doc walker, and any user-script that doesn't need the heading
+    or section-row context.  Equivalent to filtering the event stream
+    down to ``RequirementEvent`` and unwrapping each one.
+
+    Use :func:`parse_docx_events` instead when you DO need the
+    structural context (the statement-set CSV exporter is the canonical
+    example — it places each requirement in its heading hierarchy).
+    """
     return [
         e.requirement
         for e in parse_docx_events(path, resolver_fn, config=config)

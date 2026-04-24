@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, List, Optional, Sequence, Tuple
+from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
 from ._logging import make_progress_logger
 from ._orchestration import (
@@ -59,11 +59,7 @@ class ExtractionResult:
     #: Extra format → written path.  Populated when the caller passes
     #: ``emit_extra`` to :func:`extract_from_files`.  Empty dict when
     #: only the default xlsx was emitted.
-    extra_output_paths: dict = None  # type: ignore[assignment]
-
-    def __post_init__(self) -> None:
-        if self.extra_output_paths is None:
-            self.extra_output_paths = {}
+    extra_output_paths: Dict[str, Path] = field(default_factory=dict)
 
 
 class ExtractionCancelled(RuntimeError):
