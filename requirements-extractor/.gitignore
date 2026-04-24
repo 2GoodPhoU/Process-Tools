@@ -1,0 +1,43 @@
+# Python bytecode / caches
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual envs
+.venv/
+venv/
+env/
+
+# PyInstaller build / dist artefacts
+build/
+dist/
+*.manifest
+*.spec.bak
+
+# Common tool caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# IDE / editor scratch
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS cruft
+.DS_Store
+Thumbs.db
+
+# Session-local outputs — the tool writes to paths the user picks.
+# Anything landing at the repo root with these patterns is almost
+# certainly a scratch run and shouldn't be committed.
+/requirements*.xlsx
+/actors_scan.xlsx
+/diff.xlsx
+/requirements_statement_set.csv
+*.reqif
+# (Note: the above are root-level only. Fixture outputs under
+# samples/ are explicitly committed.)
