@@ -150,6 +150,7 @@ whole thing.
 | Statement-set CSV | `statement_set.py` | `test_logging_and_trail.py` |
 | Diff mode | `diff.py` | `test_diff.py` |
 | Orchestration | `extractor.py` | `test_extractor_cancel.py`, `test_batch_improvements.py` |
+| Shared orchestration helpers | `_orchestration.py` | `test_orchestration.py` |
 | CLI | `cli.py`, `extract.py` (shim) | `test_cli.py`, `test_cli_refactors.py` |
 | GUI | `gui.py`, `gui_help.py`, `gui_state.py` | `test_gui_state.py` |
 | Actors-mode scanner | `actor_scan.py` | `test_actor_scan.py` |
@@ -232,10 +233,10 @@ python3 -m venv .venv && source .venv/bin/activate  # or .venv\Scripts\activate.
 pip install -r requirements.txt
 pip install -r requirements-optional.txt  # optional but covers NLP/GUI/PDF
 python3 -m py_compile requirements_extractor/*.py  # quick syntax check
-python3 -m unittest discover tests                 # should report ~455 passing
+python3 -m unittest discover tests                 # should report ~471 passing
 ```
 
-As of end of 2026-04-24 the baseline is **455 tests passing, 0
+As of end of 2026-04-24 the baseline is **471 tests passing, 0
 failing**. Most tests are headless (no Tk, no spaCy, no LibreOffice,
 no pdfplumber required); a few are gated behind `skipUnless` so they
 run only when their integration dep is present.
@@ -311,7 +312,7 @@ I'm picking up work on the Document Data Extractor project
 `docs/PROJECT_OVERVIEW.md` — read that first.
 
 Baseline facts as of the last session:
-- 455 tests passing, 0 failing.
+- 471 tests passing, 0 failing.
 - Code lives under `requirements_extractor/`. Tests under `tests/`.
   Fixtures under `samples/edge_cases/` (5 files) and
   `samples/procedures/` (11 files).
@@ -347,7 +348,7 @@ Coding conventions I've observed in prior sessions:
 Before making changes:
 - `python3 -m py_compile requirements_extractor/*.py` to confirm
   syntax is clean.
-- `python3 -m unittest discover tests` to confirm the 455-test
+- `python3 -m unittest discover tests` to confirm the 471-test
   baseline.
 
 Now, let's [describe the task].

@@ -576,7 +576,7 @@ requirements-extractor/                (folder name — Python pkg kept for comp
 ├── samples/                           (sample files for testing)
 │   ├── edge_cases/                    (5 fixtures for parser/config edge cases)
 │   └── procedures/                    (11 fixtures for actor-ID failure modes)
-├── tests/                             (unittest suite, 455 tests)
+├── tests/                             (unittest suite, 471 tests)
 └── requirements_extractor/            (Python package — import path unchanged)
     ├── __init__.py
     ├── models.py                      (dataclasses + event types + dedup helpers)

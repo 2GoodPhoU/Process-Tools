@@ -49,8 +49,15 @@ from docx.table import Table
 from docx.text.paragraph import Paragraph
 
 from ._logging import make_progress_logger
-from .actors import ActorEntry, ActorResolver, load_actors_from_xlsx
-from .config import Config, resolve_config
+from ._orchestration import (
+    build_resolver,
+    load_actors_or_warn,
+    resolve_per_doc_config,
+    validate_input_path,
+    validate_run_config,
+)
+from .actors import ActorEntry
+from .config import Config
 from .parser import (
     _cell_text_all,
     _heading_level,
@@ -563,54 +570,14 @@ def scan_actors_from_files(
     stats = ActorScanStats()
     log = make_progress_logger(progress)
 
-    seed_entries: List[ActorEntry] = []
-    if seed_actors_xlsx is not None:
-        try:
-            seed_entries = load_actors_from_xlsx(Path(seed_actors_xlsx))
-            log(
-                f"Loaded {len(seed_entries)} seed actors from "
-                f"{Path(seed_actors_xlsx).name}."
-            )
-        except (OSError, ValueError, KeyError) as e:
-            stats.errors.append(f"Failed to load seed actors: {e}")
-            log(f"WARNING: {stats.errors[-1]}")
+    seed_entries: List[ActorEntry] = load_actors_or_warn(
+        seed_actors_xlsx, stats, log, label="seed actors",
+    )
+    resolver = build_resolver(seed_entries, use_nlp, stats, log)
 
-    resolver = ActorResolver(actors=seed_entries, use_nlp=use_nlp)
-    if use_nlp and not resolver.has_nlp():
-        stats.errors.append(
-            "NLP requested but spaCy (with an English model) is not available. "
-            "Install with:  pip install spacy  &&  python -m spacy download en_core_web_sm"
-        )
-        log(f"WARNING: {stats.errors[-1]}")
-
-    run_config_path: Optional[Path] = Path(config_path) if config_path else None
-    run_keywords_path: Optional[Path] = Path(keywords_path) if keywords_path else None
-    if run_config_path is not None:
-        try:
-            resolve_config(
-                run_config_path=run_config_path,
-                docx_path=None,
-                keywords_path=run_keywords_path,
-            )
-            log(f"Loaded run config: {run_config_path.name}")
-        except (OSError, ValueError, ImportError) as e:
-            stats.errors.append(f"Failed to load config {run_config_path}: {e}")
-            log(f"WARNING: {stats.errors[-1]}")
-            run_config_path = None
-    elif run_keywords_path is not None:
-        try:
-            resolve_config(
-                run_config_path=None,
-                docx_path=None,
-                keywords_path=run_keywords_path,
-            )
-            log(f"Loaded keywords file: {run_keywords_path.name}")
-        except (OSError, ValueError, ImportError) as e:
-            stats.errors.append(
-                f"Failed to load keywords file {run_keywords_path}: {e}"
-            )
-            log(f"WARNING: {stats.errors[-1]}")
-            run_keywords_path = None
+    run_config_path, run_keywords_path = validate_run_config(
+        config_path, keywords_path, stats, log,
+    )
 
     observations: List[ActorObservation] = []
     input_list = list(input_paths)
@@ -626,27 +593,20 @@ def scan_actors_from_files(
             file_progress(idx, total_inputs, Path(raw_path).name)
 
         path = Path(raw_path)
-        if not path.exists():
-            stats.errors.append(f"File not found: {path}")
-            log(f"WARNING: {stats.errors[-1]}")
+        validated = validate_input_path(
+            path,
+            {".docx"},
+            stats,
+            log,
+            unsupported_message=lambda p: f"Skipping non-.docx file: {p.name}",
+        )
+        if validated is None:
             continue
-        if path.suffix.lower() != ".docx":
-            stats.errors.append(f"Skipping non-.docx file: {path.name}")
-            log(f"WARNING: {stats.errors[-1]}")
-            continue
+        path = validated
 
-        try:
-            cfg: Config = resolve_config(
-                run_config_path=run_config_path,
-                docx_path=path,
-                keywords_path=run_keywords_path,
-            )
-        except (OSError, ValueError, ImportError) as e:
-            stats.errors.append(
-                f"Failed to load per-doc config for {path.name}: {e}"
-            )
-            log(f"WARNING: {stats.errors[-1]}")
-            cfg = Config.defaults()
+        cfg: Config = resolve_per_doc_config(
+            path, run_config_path, run_keywords_path, stats, log,
+        )
 
         log(f"Scanning {path.name} (config: {cfg.source}) ...")
         try:

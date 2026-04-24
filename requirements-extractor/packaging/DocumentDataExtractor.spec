@@ -95,6 +95,7 @@ a = Analysis(
         # Keep this list in sync with `requirements_extractor/*.py`.
         "requirements_extractor",
         "requirements_extractor._logging",
+        "requirements_extractor._orchestration",
         "requirements_extractor.actor_scan",
         "requirements_extractor.actors",
         "requirements_extractor.cli",

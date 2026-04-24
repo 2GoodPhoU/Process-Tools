@@ -7,8 +7,14 @@ from pathlib import Path
 from typing import Callable, List, Optional, Sequence, Tuple
 
 from ._logging import make_progress_logger
-from .actors import ActorResolver, load_actors_from_xlsx
-from .config import Config, resolve_config
+from ._orchestration import (
+    build_resolver,
+    load_actors_or_warn,
+    resolve_per_doc_config,
+    validate_input_path,
+    validate_run_config,
+)
+from .config import Config
 from .models import (
     ExtractionStats,
     Requirement,
@@ -116,61 +122,14 @@ def extract_from_files(
     stats = ExtractionStats()
     log = make_progress_logger(progress)
 
-    actors = []
-    if actors_xlsx is not None:
-        try:
-            actors = load_actors_from_xlsx(Path(actors_xlsx))
-            log(f"Loaded {len(actors)} actors from {Path(actors_xlsx).name}.")
-        except (OSError, ValueError, KeyError) as e:
-            # OSError: file missing / permission / locked.  ValueError:
-            # bad header.  KeyError: header present but empty-but-required
-            # cell that openpyxl propagates.
-            stats.errors.append(f"Failed to load actors file: {e}")
-            log(f"WARNING: {stats.errors[-1]}")
-
-    resolver = ActorResolver(actors=actors, use_nlp=use_nlp)
-    if use_nlp and not resolver.has_nlp():
-        stats.errors.append(
-            "NLP requested but spaCy (with an English model) is not available. "
-            "Install with:  pip install spacy  &&  python -m spacy download en_core_web_sm"
-        )
-        log(f"WARNING: {stats.errors[-1]}")
+    actors = load_actors_or_warn(actors_xlsx, stats, log, label="actors")
+    resolver = build_resolver(actors, use_nlp, stats, log)
 
     # Validate the per-run config once up front so typos surface before we
     # parse any documents.  (Per-doc overrides are loaded lazily below.)
-    run_config_path: Optional[Path] = Path(config_path) if config_path else None
-    run_keywords_path: Optional[Path] = Path(keywords_path) if keywords_path else None
-    if run_config_path is not None:
-        try:
-            resolve_config(
-                run_config_path=run_config_path,
-                docx_path=None,
-                keywords_path=run_keywords_path,
-            )
-            log(f"Loaded run config: {run_config_path.name}")
-        except (OSError, ValueError, ImportError) as e:
-            # OSError covers FileNotFoundError/PermissionError.  ValueError
-            # covers YAML parse errors and schema validation in config.py.
-            # ImportError surfaces if PyYAML isn't installed for a .yaml file.
-            stats.errors.append(f"Failed to load config {run_config_path}: {e}")
-            log(f"WARNING: {stats.errors[-1]}")
-            run_config_path = None
-    elif run_keywords_path is not None:
-        # No main --config, but we still want to catch a broken keywords
-        # file up front instead of on first document.
-        try:
-            resolve_config(
-                run_config_path=None,
-                docx_path=None,
-                keywords_path=run_keywords_path,
-            )
-            log(f"Loaded keywords file: {run_keywords_path.name}")
-        except (OSError, ValueError, ImportError) as e:
-            stats.errors.append(
-                f"Failed to load keywords file {run_keywords_path}: {e}"
-            )
-            log(f"WARNING: {stats.errors[-1]}")
-            run_keywords_path = None
+    run_config_path, run_keywords_path = validate_run_config(
+        config_path, keywords_path, stats, log,
+    )
 
     all_reqs: List[Requirement] = []
     events_per_file: List[Tuple[str, List[object]]] = []
@@ -187,35 +146,27 @@ def extract_from_files(
         if file_progress is not None:
             file_progress(idx, total_inputs, Path(path).name)
         path = Path(path)
-        if not path.exists():
-            stats.errors.append(f"File not found: {path}")
-            log(f"WARNING: {stats.errors[-1]}")
-            continue
-        suffix = path.suffix.lower()
-        if suffix not in {".docx", ".doc", ".pdf"}:
-            stats.errors.append(
-                f"Skipping unsupported file: {path.name} "
+        validated = validate_input_path(
+            path,
+            {".docx", ".doc", ".pdf"},
+            stats,
+            log,
+            unsupported_message=lambda p: (
+                f"Skipping unsupported file: {p.name} "
                 f"(expected .docx, .doc, or .pdf)"
-            )
-            log(f"WARNING: {stats.errors[-1]}")
+            ),
+        )
+        if validated is None:
             continue
+        path = validated
 
         # Per-doc config discovery happens here so each file can override.
         # We pass the original path so ``<stem>.reqx.yaml`` lookups work
         # against the authored document regardless of whether we'll
         # actually parse a converted temp copy below.
-        try:
-            cfg: Config = resolve_config(
-                run_config_path=run_config_path,
-                docx_path=path,
-                keywords_path=run_keywords_path,
-            )
-        except (OSError, ValueError, ImportError) as e:
-            stats.errors.append(
-                f"Failed to load per-doc config for {path.name}: {e}"
-            )
-            log(f"WARNING: {stats.errors[-1]}")
-            cfg = Config.defaults()
+        cfg: Config = resolve_per_doc_config(
+            path, run_config_path, run_keywords_path, stats, log,
+        )
 
         log(f"Parsing {path.name} (config: {cfg.source}) ...")
         try:
