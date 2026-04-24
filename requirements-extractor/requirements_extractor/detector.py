@@ -142,6 +142,158 @@ def split_sentences(text: str) -> List[str]:
 
 
 # ---------------------------------------------------------------------------
+# Confidence computation (REVIEW §1.9).
+#
+# Old heuristic was length-only: sentences between 5 and 60 words got
+# "High", shorter got "Low", longer got "Medium".  Field use showed that
+# was too coarse — a short sentence with a measurable clause ("Response
+# time shall be below 200 ms.") is actually high-confidence, while a
+# long sentence stuffed with vague qualifiers ("The system shall
+# produce output that is appropriate, reasonable, and timely in the
+# judgement of the reviewing authority.") really is medium at best.
+#
+# The upgrade: start from length, then shift one step down on a vague
+# qualifier, one step up on a measurable clause.  Net effect depends on
+# what the sentence carries — a vague AND measurable sentence lands
+# back at the length-based baseline, which is correct.
+# ---------------------------------------------------------------------------
+
+
+#: Lower-cased phrases that indicate vague, reviewer-needs-to-check
+#: language.  Presence of any one of these shifts confidence one step
+#: down.  Word-boundary-matched on the left; right side is greedy so
+#: "reasonable" matches "reasonable.", "reasonable," etc.
+_VAGUE_QUALIFIERS: Tuple[str, ...] = (
+    "appropriate",
+    "reasonable",
+    "sufficient",
+    "adequate",
+    "suitable",
+    "acceptable",
+    "where practical",
+    "where appropriate",
+    "where feasible",
+    "as needed",
+    "as appropriate",
+    "as required",
+    "timely",
+    "in a timely manner",
+    "in general",
+    "generally",
+    "usually",
+    "typically",
+    "if possible",
+    "if practical",
+)
+
+
+#: Patterns that indicate a measurable clause — a numeric threshold, a
+#: unit, a tolerance, a timeout, etc.  Presence of any one of these
+#: shifts confidence one step up.  Matched case-insensitively.
+_MEASURABLE_PATTERNS: Tuple["re.Pattern[str]", ...] = (
+    # Numbers followed by a unit (time, size, frequency, percentage).
+    re.compile(
+        r"\b\d+(?:\.\d+)?\s*"
+        r"(?:ms|milliseconds?|seconds?|s|minutes?|mins?|hours?|hrs?|days?"
+        r"|ns|us|µs"
+        r"|bits?|bytes?|kb|mb|gb|tb|kib|mib|gib"
+        r"|hz|khz|mhz|ghz"
+        r"|%|percent|pct"
+        r"|volts?|v|amps?|a|watts?|w"
+        r"|m|cm|mm|km|ft|in|inches|pixels?|px)\b",
+        flags=re.IGNORECASE,
+    ),
+    # Tolerances and bounds: "± 5", "+/- 10", "at most N", "at least N",
+    # "no more than N", "no less than N", "within N".
+    re.compile(r"[±]\s*\d+", flags=re.IGNORECASE),
+    re.compile(r"\+/-\s*\d+", flags=re.IGNORECASE),
+    re.compile(
+        r"\b(?:at most|at least|no more than|no less than|no fewer than"
+        r"|greater than|less than|exactly|within)\s+\d+",
+        flags=re.IGNORECASE,
+    ),
+    # Ratios / frequencies: "1 in 10000", "once per day", "per second".
+    re.compile(r"\b\d+\s+(?:in|out of|per)\s+\d+\b", flags=re.IGNORECASE),
+    re.compile(r"\bper\s+(?:second|minute|hour|day|request|call)\b",
+               flags=re.IGNORECASE),
+)
+
+
+def _has_vague_qualifier(text: str) -> bool:
+    """Return True iff ``text`` contains any phrase from :data:`_VAGUE_QUALIFIERS`.
+
+    Word-boundary aware on the left so ``reasonable`` doesn't match
+    inside ``unreasonable`` — we want the bare adjective.  Right side
+    uses plain ``in`` containment, which is fine because the vague
+    list's phrases are themselves multi-word tokens ("where practical").
+    """
+    if not text:
+        return False
+    low = text.lower()
+    for phrase in _VAGUE_QUALIFIERS:
+        # Simple word-bounded search: (?<!\w)phrase — cheap and good
+        # enough for the short phrase list above.
+        idx = 0
+        while True:
+            idx = low.find(phrase, idx)
+            if idx == -1:
+                break
+            left_ok = idx == 0 or not low[idx - 1].isalnum()
+            if left_ok:
+                return True
+            idx += 1
+    return False
+
+
+def _has_measurable_clause(text: str) -> bool:
+    """Return True iff ``text`` contains a numeric threshold or unit."""
+    if not text:
+        return False
+    return any(p.search(text) is not None for p in _MEASURABLE_PATTERNS)
+
+
+def _signal_offset(text: str) -> int:
+    """Net confidence adjustment from the two signals.
+
+    +1 when a measurable clause is present, -1 when a vague qualifier
+    is present.  Both present → 0 (they cancel, which is the right
+    answer for a sentence like "within 5 seconds where practical").
+    """
+    offset = 0
+    if _has_measurable_clause(text):
+        offset += 1
+    if _has_vague_qualifier(text):
+        offset -= 1
+    return offset
+
+
+def compute_confidence(text: str) -> str:
+    """Return ``"High"`` / ``"Medium"`` / ``"Low"`` for a requirement sentence.
+
+    Baseline is length: 5–60 words is High, <5 is Low, >60 is Medium.
+    The signal offset from :func:`_signal_offset` then shifts one step
+    in the appropriate direction, clamped to the three tiers.
+
+    Public because :mod:`requirements_extractor.parser` calls it on the
+    procedural-table force-requirement path (where no keyword match
+    drives classify but we still want a length-and-signal-based grade).
+    """
+    length = len((text or "").split())
+    if 5 <= length <= 60:
+        base = 1          # High
+    elif length < 5:
+        base = -1         # Low
+    else:
+        base = 0          # Medium
+    shifted = base + _signal_offset(text)
+    if shifted >= 1:
+        return "High"
+    if shifted <= -1:
+        return "Low"
+    return "Medium"
+
+
+# ---------------------------------------------------------------------------
 # KeywordMatcher — configurable classifier.
 # ---------------------------------------------------------------------------
 
@@ -195,9 +347,6 @@ class KeywordMatcher:
         ws = sorted(ws, key=len, reverse=True)
         kw_alt = "|".join(re.escape(w) for w in ws)
         spaced_alt = "|".join(_NEGATION_SPACED)
-        # Two branches joined by alternation:
-        #   1. modal + optional filler + spaced negation ("shall not")
-        #   2. modal directly suffixed by n't ("can't", "won't")
         return re.compile(
             rf"\b(?:{kw_alt})"
             rf"(?:(?:\s+\w{{1,20}})?\s+(?:{spaced_alt})\b|{_NEGATION_SUFFIX}\b)",
@@ -221,17 +370,20 @@ class KeywordMatcher:
 
         if hard_hits:
             keywords = sorted(set(hard_hits) | set(soft_hits))
-            length = len(text.split())
-            if 5 <= length <= 60:
-                confidence = "High"
-            elif length < 5:
-                confidence = "Low"
-            else:
-                confidence = "Medium"
-            return "Hard", keywords, confidence
+            return "Hard", keywords, compute_confidence(text)
 
         if soft_hits:
             keywords = sorted(set(soft_hits))
+            # Soft keywords already indicate uncertainty, so start at
+            # Medium and only let the strong signals (vague vs.
+            # measurable) shift one step.  This keeps Soft matches from
+            # ever reporting "High" purely on length — the modal-
+            # uncertainty dominates.
+            base_offset = _signal_offset(text)
+            if base_offset >= 1:
+                return "Soft", keywords, "High"
+            if base_offset <= -1:
+                return "Soft", keywords, "Low"
             return "Soft", keywords, "Medium"
 
         return "", [], ""
@@ -300,10 +452,5 @@ _DEFAULT_MATCHER = KeywordMatcher.default()
 
 
 def classify(text: str) -> Tuple[str, List[str], str]:
-    """Classify using the built-in HARD/SOFT keyword lists."""
+    """Classify a sentence using the built-in keyword defaults."""
     return _DEFAULT_MATCHER.classify(text)
-
-
-def is_negative(text: str) -> bool:
-    """Detect negation using the built-in HARD/SOFT keyword lists."""
-    return _DEFAULT_MATCHER.is_negative(text)

@@ -420,15 +420,27 @@ def build_parallel_flows() -> None:
 def _add_3col_header(t) -> None:
     """Populate the header row of a 3-column procedural table.
 
-    The literal "Required action" header is part of what makes these
-    tables special — the column title itself is the signal that every
-    content cell is a requirement, keyword-matched or not.  Kept as a
-    helper so every 3-col fixture uses the same header wording and any
-    future header-aware parser work has one place to grep for.
+    The header is intentionally:
+
+        |  (blank)  |  Step  |  Required Action  |
+
+    — a blank column-1 header, a "Step" column-2 header, and a
+    "Required Action" column-3 header (both words capitalised).  The
+    combination is the table-type signal Eric flagged in his
+    2026-04-23 pass: whenever a 3-column table has this specific
+    header shape, every non-empty row should be treated as a
+    requirement regardless of modal-keyword content (shall/must/etc).
+
+    All four of the `procedural_*` fixtures below share this header by
+    design — they differ in what they stuff into the body rows, not in
+    the type signal itself.  The header-aware parser work that
+    eventually lands should key off exactly this shape; any other
+    3-column table (e.g. "Actor | Step | Required Action") keeps the
+    normal keyword-driven detection path.
     """
-    _write_cell(t.rows[0].cells[0], "Actor")
+    _write_cell(t.rows[0].cells[0], "")
     _write_cell(t.rows[0].cells[1], "Step")
-    _write_cell(t.rows[0].cells[2], "Required action")
+    _write_cell(t.rows[0].cells[2], "Required Action")
 
 
 #: Default per-doc config for the 3-col fixtures below.  Writing the
@@ -770,6 +782,146 @@ def build_procedural_no_keywords() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Sample 10 — Mixed-language procedure
+# ---------------------------------------------------------------------------
+
+
+def build_mixed_language() -> None:
+    """2-column table whose content mixes English and Spanish sentences.
+
+    The extractor is keyword-driven and English-focused: modal verbs
+    like "shall" / "must" don't have clean Spanish cognates, so
+    Spanish-only rows should drop out of the Hard/Soft classifier.
+    The English rows must still be captured cleanly.  Useful for
+    testing the failure mode where only a subset of the corpus is
+    parseable.
+    """
+    doc = Document()
+    doc.add_heading("Procedure \u2014 Customer Onboarding (Bilingual)", level=0)
+    doc.add_paragraph("Document ID: PROC-BILING-010")
+    doc.add_paragraph(
+        "Sample document combining English requirements with Spanish "
+        "operator notes.  Only the English rows should be captured as "
+        "requirements."
+    )
+
+    _add_heading(doc, "10. Onboarding Steps", level=1)
+    t = doc.add_table(rows=6, cols=2)
+    t.style = "Table Grid"
+
+    _write_cell(t.rows[0].cells[0], "Account Manager")
+    _write_cell(
+        t.rows[0].cells[1],
+        "The Account Manager shall validate the customer identification "
+        "before creating any account.",
+    )
+
+    _write_cell(t.rows[1].cells[0], "Gestor de Cuentas")
+    _write_cell(
+        t.rows[1].cells[1],
+        "El Gestor de Cuentas debe verificar los documentos del cliente "
+        "antes de crear la cuenta.",
+    )
+
+    _write_cell(t.rows[2].cells[0], "Compliance Officer")
+    _write_cell(
+        t.rows[2].cells[1],
+        "The Compliance Officer must review the validation result within "
+        "two business days.",
+    )
+
+    _write_cell(t.rows[3].cells[0], "Oficial de Cumplimiento")
+    _write_cell(
+        t.rows[3].cells[1],
+        "El Oficial de Cumplimiento revisa el resultado de la "
+        "validaci\u00f3n en un plazo de dos d\u00edas h\u00e1biles.",
+    )
+
+    _write_cell(t.rows[4].cells[0], "Account Manager")
+    _write_cell(
+        t.rows[4].cells[1],
+        "The Account Manager shall notify the customer of the approval "
+        "decision via the registered email address.",
+    )
+
+    _write_cell(t.rows[5].cells[0], "Gestor de Cuentas")
+    _write_cell(
+        t.rows[5].cells[1],
+        "El Gestor de Cuentas notifica al cliente sobre la decisi\u00f3n "
+        "de aprobaci\u00f3n por correo electr\u00f3nico.",
+    )
+
+    doc.save(HERE / "mixed_language.docx")
+
+
+# ---------------------------------------------------------------------------
+# Sample 11 — Long procedure (throughput / cancel-path stress)
+# ---------------------------------------------------------------------------
+
+
+def build_long_procedure() -> None:
+    """A deliberately long 2-column procedure (50+ rows).
+
+    Exercises the throughput path, the file-progress callback cadence
+    in the GUI, and — when paired with a short ``cancel_check`` loop
+    in a test — the cancel path's ability to break out mid-table
+    without writing a partial output.  Content is industry-generic
+    release-engineering prose; actors rotate through a fixed roster
+    so the actor-ID path has many samples to lock in.
+    """
+    doc = Document()
+    doc.add_heading("Procedure \u2014 Extended Release Workflow", level=0)
+    doc.add_paragraph("Document ID: PROC-LONG-011")
+    doc.add_paragraph(
+        "Fifty-step release workflow.  Used as a throughput and "
+        "cancel-path stress fixture; not a template for a real release "
+        "procedure."
+    )
+
+    _add_heading(doc, "11. Extended Release Steps", level=1)
+
+    actors = ("QA Lead", "Release Manager", "Duty Engineer", "Security Officer")
+    verbs = (
+        "shall verify",
+        "must confirm",
+        "shall record",
+        "must notify",
+        "shall validate",
+        "must sign off",
+        "shall capture",
+        "must approve",
+    )
+    subjects = (
+        "the build manifest",
+        "the release candidate artifact",
+        "the canary telemetry dashboard",
+        "the rollback plan",
+        "the incident response runbook",
+        "the change-management ticket",
+        "the signed approval record",
+        "the post-deployment smoke suite",
+        "the security scan report",
+        "the compliance attestation",
+    )
+
+    n = 52   # 50+ rows; a few more so cancel-path timing tests have margin
+    t = doc.add_table(rows=n, cols=2)
+    t.style = "Table Grid"
+    for i in range(n):
+        actor = actors[i % len(actors)]
+        verb = verbs[i % len(verbs)]
+        subject = subjects[i % len(subjects)]
+        _write_cell(t.rows[i].cells[0], actor)
+        _write_cell(
+            t.rows[i].cells[1],
+            f"Step {i + 1}: The {actor} {verb} {subject} "
+            f"before the next gate.",
+        )
+
+    doc.save(HERE / "long_procedure.docx")
+
+
+# ---------------------------------------------------------------------------
 # Runner
 # ---------------------------------------------------------------------------
 
@@ -784,6 +936,8 @@ def main() -> None:
     build_procedural_multi_actor_cell()
     build_procedural_bullet_rows()
     build_procedural_no_keywords()
+    build_mixed_language()
+    build_long_procedure()
     docs = sorted(HERE.glob("*.docx"))
     configs = sorted(HERE.glob("*.reqx.yaml"))
     print(f"Generated {len(docs)} procedure fixtures in {HERE}:")

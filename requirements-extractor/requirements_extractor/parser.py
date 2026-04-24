@@ -44,7 +44,7 @@ from docx.table import Table, _Cell
 from docx.text.paragraph import Paragraph
 
 from .config import Config
-from .detector import KeywordMatcher, split_sentences
+from .detector import KeywordMatcher, compute_confidence, split_sentences
 from .models import (
     HeadingEvent,
     Requirement,
@@ -206,6 +206,66 @@ def _cell_intro_text(cell: _Cell) -> str:
     return " ".join(parts).strip()
 
 
+# ---------------------------------------------------------------------------
+# Procedural "required-action" table detection.
+#
+# Eric 2026-04-23 work-network pass: a recurring document shape is a
+# 3-column procedural table whose header row is literally:
+#
+#     |  (blank)  |  Step  |  Required Action  |
+#
+# Every body row of such a table is a requirement *by virtue of the header
+# shape*, regardless of whether the content sentence contains shall / must /
+# etc.  The column mapping is fixed: actor=1, step=2, content=3.
+#
+# Only tables matching this exact header take the force-requirement code
+# path; other 3-column tables (e.g. "Actor | Step | Required Action" with a
+# non-blank col-1 header) continue down the normal keyword-driven detection
+# path.  That gating matters — a blanket "3-column table = required-action
+# table" rule would light up every non-requirements roster that happens to
+# have three columns.
+# ---------------------------------------------------------------------------
+
+
+#: Expected header cells (lower-cased, whitespace-collapsed) for a
+#: required-action table.  The column-1 header is an empty string — that's
+#: part of the type signal.
+_REQUIRED_ACTION_HEADER = ("", "step", "required action")
+
+
+#: Synthetic keyword label for rows captured by the header signal rather
+#: than by a modal-keyword match.  Visible to reviewers in the output's
+#: Keywords column so they can tell which detection path fired.
+REQUIRED_ACTION_KEYWORD = "(Required Action)"
+
+
+def _normalise_header_cell(text: str) -> str:
+    """Return ``text`` lower-cased with internal whitespace collapsed.
+
+    Header comparisons are forgiving about casing and stray whitespace so
+    a fixture authored with ``Required Action`` and a document authored
+    with ``REQUIRED  ACTION`` or ``required\naction`` both match.
+    """
+    return " ".join((text or "").split()).lower()
+
+
+def is_required_action_header(row_cells_text: List[str]) -> bool:
+    """Return True iff ``row_cells_text`` matches the procedural header.
+
+    Takes a list of strings (the already-extracted text of each cell in a
+    candidate header row) rather than python-docx objects so it can be
+    unit-tested headlessly.  Matches exactly three cells with normalised
+    contents ``("", "step", "required action")``.
+
+    Case-insensitive and whitespace-tolerant: ``"Required  Action"`` /
+    ``"REQUIRED ACTION"`` / ``"  Required\nAction  "`` all match the
+    column-3 slot.
+    """
+    if len(row_cells_text) != 3:
+        return False
+    return tuple(_normalise_header_cell(c) for c in row_cells_text) == _REQUIRED_ACTION_HEADER
+
+
 def _update_heading_trail(trail: List[str], level: int, text: str) -> None:
     """Update the trail so index ``level - 1`` holds ``text``.
 
@@ -229,6 +289,105 @@ def _update_heading_trail(trail: List[str], level: int, text: str) -> None:
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# Multi-actor-cell resolution (FIELD_NOTES §4 case 3 / Eric 2026-04-23).
+#
+# In procedural required-action tables, column 1 may list several eligible
+# actors for a single step: "Auth Service, Gateway, Logger" or
+# "Auth Service / Gateway / Logger".  The requirement text itself then
+# picks which of the candidates actually performs the step ("The Gateway
+# shall forward...").  We parse the cell as a *set* of candidates and,
+# for each sentence, prefer the candidate whose name appears earliest in
+# the sentence.  Sentences that don't name any candidate fall back to the
+# joined cell text — preserving the caller's view that all candidates may
+# be involved.
+# ---------------------------------------------------------------------------
+
+
+# Separators recognised when splitting a candidate-cell: comma, semicolon,
+# " / " (with spaces), " and " (word-bounded), " & " (spaces).  Matches
+# authors' common conventions; intentionally does NOT split on plain " "
+# since most single-actor names have internal spaces ("Auth Service").
+_CANDIDATE_SPLIT_RE = re.compile(
+    r"\s*[,;]\s*|\s+/\s+|\s+&\s+|\s+and\s+",
+    flags=re.IGNORECASE,
+)
+
+
+def _split_candidate_actors(cell_text: str) -> List[str]:
+    """Parse a candidate-cell into a list of actor names.
+
+    Returns [] when the cell only names one actor (no separators) — the
+    caller should then treat the cell as a conventional single-actor
+    primary.  Trims each candidate and drops empty fragments so trailing
+    separators ("A, B,") don't produce ghost entries.
+    """
+    s = (cell_text or "").strip()
+    if not s:
+        return []
+    parts = [p.strip() for p in _CANDIDATE_SPLIT_RE.split(s)]
+    parts = [p for p in parts if p]
+    # A single-actor cell (no separators) still returns [s] from the split;
+    # the "multi-actor" signal is having at least two parts.
+    if len(parts) < 2:
+        return []
+    return parts
+
+
+def _pick_primary(
+    sentence: str,
+    default_primary: str,
+    candidates: Optional[List[str]],
+) -> str:
+    """Choose the effective primary actor for ``sentence``.
+
+    When ``candidates`` is falsy, just returns ``default_primary``
+    unchanged — callers who don't care about multi-actor resolution get
+    the existing behaviour.  When candidates are present, tries to
+    resolve from the sentence subject; falls back to ``default_primary``
+    if no candidate appears in the sentence.  This keeps rows whose
+    text doesn't name a specific candidate attributed to the full
+    candidate list (the joined cell text) rather than silently dropping
+    them to an empty actor.
+    """
+    if not candidates:
+        return default_primary
+    picked = _resolve_primary_from_candidates(sentence, candidates)
+    return picked if picked is not None else default_primary
+
+
+def _resolve_primary_from_candidates(
+    sentence: str, candidates: List[str]
+) -> Optional[str]:
+    """Pick the candidate whose name appears earliest in ``sentence``.
+
+    Returns ``None`` when no candidate name is found, so the caller can
+    decide what fallback to use (typically: the joined cell text).  Case-
+    and word-boundary aware — ``"Authentication Service"`` will not match
+    a candidate named ``"Auth Service"``.
+    """
+    if not sentence or not candidates:
+        return None
+    lower_sent = sentence.lower()
+    best: Optional[tuple] = None  # (position, candidate)
+    for cand in candidates:
+        if not cand:
+            continue
+        pattern = r"\b" + re.escape(cand.lower()) + r"\b"
+        m = re.search(pattern, lower_sent)
+        if m is None:
+            continue
+        pos = m.start()
+        if best is None or pos < best[0]:
+            best = (pos, cand)
+    return best[1] if best else None
+
+
+#: Re-exported for the force-requirement path so a future confidence
+#: upgrade in :mod:`detector` lands in every code path automatically.
+_length_based_confidence = compute_confidence
+
+
 def _emit_candidate(
     text: str,
     ctx: _ParseContext,
@@ -236,12 +395,22 @@ def _emit_candidate(
     row_ref: str,
     block_ref: str,
     primary_actor: str,
+    force_requirement: bool = False,
 ) -> Optional[Requirement]:
     """Build a Requirement iff ``text`` passes detection + config filters.
 
     Returns None when the sentence should be dropped (not a requirement,
     filtered by ``content.skip_if_starts_with`` / ``skip_pattern``, or
     missing a required primary actor).
+
+    When ``force_requirement`` is True the keyword-match gate is bypassed
+    and the sentence is emitted as Hard with a synthetic
+    ``(Required Action)`` keyword label.  Used for rows inside a
+    procedural required-action table — the table-type signal tells us
+    every row is binding even when the text doesn't use shall / must /
+    etc.  A Hard keyword match still wins if one is present (it carries
+    richer keyword info), so force mode only kicks in when the classifier
+    would otherwise drop the row.
     """
     # Content-level filter: skip by prefix / pattern.
     if ctx.config.content.should_skip(text):
@@ -249,7 +418,13 @@ def _emit_candidate(
 
     req_type, keywords, confidence = ctx.matcher.classify(text)
     if not req_type:
-        return None
+        if not force_requirement:
+            return None
+        # Header-signalled requirement — synthesise the classification so
+        # downstream writers / reviewers can see why it was captured.
+        req_type = "Hard"
+        keywords = [REQUIRED_ACTION_KEYWORD]
+        confidence = _length_based_confidence(text)
 
     # Optional "must have an actor to count" filter.
     if ctx.config.content.require_primary_actor and not (primary_actor or "").strip():
@@ -289,6 +464,8 @@ def _walk_content(
     resolver_fn,
     ref_prefix: str = "",
     recursive: Optional[bool] = None,
+    force_requirement: bool = False,
+    candidate_actors: Optional[List[str]] = None,
 ) -> Iterator[Requirement]:
     """Walk the paragraph/table children of ``parent`` and yield Requirements.
 
@@ -296,6 +473,19 @@ def _walk_content(
     table, but this function also handles nested tables (recursively) and
     is reused for preamble prose.  ``ref_prefix`` is the dotted-path string
     we prepend to per-block refs so nested items stay traceable.
+
+    ``force_requirement`` bypasses the keyword-match gate — set to True
+    when the caller already knows every sentence here is a requirement
+    (e.g. inside a procedural required-action table).  See
+    :func:`_emit_candidate` for the exact semantics.
+
+    ``candidate_actors`` enables per-sentence primary-actor resolution for
+    procedural rows where the actor cell lists multiple candidates
+    ("Auth Service, Gateway, Logger").  When provided, each sentence is
+    scanned for the earliest candidate name and that candidate becomes
+    the primary actor for the emitted requirement.  Sentences that don't
+    name any candidate fall back to ``primary_actor`` (typically the
+    joined cell text).
     """
     if recursive is None:
         recursive = ctx.config.parser.recursive
@@ -321,23 +511,31 @@ def _walk_content(
             if _is_bullet(block):
                 bullet_idx += 1
                 br = _push_ref(f"Bullet {bullet_idx}")
+                actor_for_this = _pick_primary(
+                    text, primary_actor, candidate_actors
+                )
                 req = _emit_candidate(
                     text, ctx,
-                    row_ref=row_ref, block_ref=br, primary_actor=primary_actor,
+                    row_ref=row_ref, block_ref=br, primary_actor=actor_for_this,
+                    force_requirement=force_requirement,
                 )
                 if req is not None:
-                    req.secondary_actors = resolver_fn(text, primary_actor)
+                    req.secondary_actors = resolver_fn(text, actor_for_this)
                     yield req
             else:
                 paragraph_idx += 1
                 br = _push_ref(f"Paragraph {paragraph_idx}")
                 for sent in split_sentences(text):
+                    actor_for_this = _pick_primary(
+                        sent, primary_actor, candidate_actors
+                    )
                     req = _emit_candidate(
                         sent, ctx,
-                        row_ref=row_ref, block_ref=br, primary_actor=primary_actor,
+                        row_ref=row_ref, block_ref=br, primary_actor=actor_for_this,
+                        force_requirement=force_requirement,
                     )
                     if req is not None:
-                        req.secondary_actors = resolver_fn(sent, primary_actor)
+                        req.secondary_actors = resolver_fn(sent, actor_for_this)
                         yield req
         elif isinstance(block, Table):
             nested_table_idx += 1
@@ -356,6 +554,8 @@ def _walk_content(
                             resolver_fn=resolver_fn,
                             ref_prefix=nested_prefix,
                             recursive=True,
+                            force_requirement=force_requirement,
+                            candidate_actors=candidate_actors,
                         )
             else:
                 # Legacy one-level behaviour: flatten each nested cell's
@@ -372,6 +572,7 @@ def _walk_content(
                                 sent, ctx,
                                 row_ref=row_ref, block_ref=br,
                                 primary_actor=primary_actor,
+                                force_requirement=force_requirement,
                             )
                             if req is not None:
                                 req.secondary_actors = resolver_fn(sent, primary_actor)
@@ -442,26 +643,71 @@ def parse_docx_events(
                 continue
 
             num_cols = len(block.columns)
-            is_req_table = cfg.tables.is_requirement_table(num_cols)
-            actor_idx = cfg.tables.actor_column - 1      # to 0-based
-            content_idx = cfg.tables.content_column - 1
+
+            # Procedural "required-action" detection.  The header shape
+            #     |  (blank)  |  Step  |  Required Action  |
+            # forces the table into req-table mode with the procedural
+            # column mapping (actor=1, content=3) and marks every
+            # content row as a requirement regardless of modal keywords.
+            # Runs BEFORE the generic is_requirement_table check so the
+            # signal works even without a paired .reqx.yaml — the
+            # header itself is the table-type declaration.
+            procedural_required_action = False
+            header_row_index: Optional[int] = None
+            if num_cols == 3 and len(block.rows) >= 1:
+                header_cells_text = [
+                    _cell_text_all(c) for c in block.rows[0].cells
+                ]
+                if is_required_action_header(header_cells_text):
+                    procedural_required_action = True
+                    header_row_index = 0
+
+            if procedural_required_action:
+                actor_idx = 0        # col 1 (0-based)
+                content_idx = 2      # col 3 (0-based)
+                is_req_table = True
+            else:
+                is_req_table = cfg.tables.is_requirement_table(num_cols)
+                actor_idx = cfg.tables.actor_column - 1
+                content_idx = cfg.tables.content_column - 1
+
+            # Table-local state for blank-actor continuation.  In
+            # procedural required-action tables, a blank column-1 body
+            # cell inherits the actor from the nearest non-blank
+            # predecessor row within the *same* table (FIELD_NOTES §4
+            # + Eric's 2026-04-23 pass).  Tracker is scoped to this
+            # table so it can never leak into the next one.
+            last_non_blank_actor = ""
 
             for r_idx, row in enumerate(block.rows, start=1):
                 cells = row.cells
                 row_ref = f"Table {ctx.table_index}, Row {r_idx}"
 
+                # Skip the header row when we've identified one via the
+                # required-action signal.  Body rows start at r_idx == 2.
+                if header_row_index is not None and r_idx == header_row_index + 1:
+                    continue
+
                 if is_req_table and len(cells) > max(actor_idx, content_idx):
                     topic = _cell_text_all(cells[actor_idx])
                     content_cell = cells[content_idx]
+
+                    # Blank-actor continuation (procedural tables only).
+                    # Outside procedural mode a blank actor column has
+                    # different semantics (see implicit_system_actor
+                    # fixture), so this path is gated to avoid changing
+                    # the long-standing behaviour for 2-col tables.
+                    if procedural_required_action:
+                        if topic.strip():
+                            last_non_blank_actor = topic
+                        elif last_non_blank_actor:
+                            topic = last_non_blank_actor
 
                     # Skip this row when it matches a user-configured title.
                     if cfg.skip_sections.matches_title(topic):
                         continue
 
                     if section_re.match(topic or ""):
-                        # Section-style row: emit a structural event, set
-                        # the current section title, then walk content for
-                        # any requirements found directly inside it.
                         intro = _cell_intro_text(content_cell)
                         ctx.current_section_title = topic
                         events.append(
@@ -469,31 +715,41 @@ def parse_docx_events(
                                 title=topic, intro=intro, row_ref=row_ref,
                             )
                         )
-                        # Requirements inside a section-style row have no
-                        # obvious primary actor — use "" so they can still
-                        # be filtered out by require_primary_actor if the
-                        # user wants strict output.
                         for req in _walk_content(
                             content_cell, ctx,
                             row_ref=row_ref,
                             primary_actor="",
                             resolver_fn=resolver_fn,
+                            force_requirement=procedural_required_action,
+                            candidate_actors=None,
                         ):
                             events.append(RequirementEvent(requirement=req))
                     else:
-                        # Actor/topic row.
+                        # Multi-actor cell resolution: parse the column-1
+                        # text as a candidate set.  Only activated inside
+                        # procedural required-action tables to avoid
+                        # changing behaviour for conventional 2-col
+                        # tables.  Non-procedural rows fall through with
+                        # candidate_actors=None (old behaviour).
+                        row_candidates: Optional[List[str]] = None
+                        if procedural_required_action:
+                            split = _split_candidate_actors(topic)
+                            if split:
+                                row_candidates = split
+
                         for req in _walk_content(
                             content_cell, ctx,
                             row_ref=row_ref,
                             primary_actor=topic,
                             resolver_fn=resolver_fn,
+                            force_requirement=procedural_required_action,
+                            candidate_actors=row_candidates,
                         ):
                             events.append(RequirementEvent(requirement=req))
                 else:
-                    # Not a requirements table (wrong column count or user
-                    # asked us to treat this table as data-only).  Walk
-                    # every cell anyway so nothing gets silently dropped,
-                    # but with no primary actor.
+                    # Not a requirements table — walk every cell anyway
+                    # so nothing gets silently dropped, but with no
+                    # primary actor.
                     for c_idx, cell in enumerate(cells, start=1):
                         for req in _walk_content(
                             cell, ctx,

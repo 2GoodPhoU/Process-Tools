@@ -29,6 +29,7 @@ from requirements_extractor.cli import main
 from requirements_extractor.extractor import extract_from_files
 from requirements_extractor.models import (
     Requirement,
+    annotate_cross_source_duplicates,
     compute_stable_id,
     ensure_unique_stable_ids,
 )
@@ -290,6 +291,111 @@ class TestDryRunCLI(unittest.TestCase):
             # Two sample lines expected.
             self.assertIn("REQ-", output)
             self.assertIn("First 2 sample(s):", output)
+
+
+# ---------------------------------------------------------------------------
+# annotate_cross_source_duplicates — REVIEW §1.10
+# ---------------------------------------------------------------------------
+
+
+class TestCrossSourceDedup(unittest.TestCase):
+    """Flag ``(actor, text)`` duplicates across files by annotating the
+    later row's notes with a pointer to the original.
+    """
+
+    def test_unique_rows_untouched(self) -> None:
+        reqs = [
+            _make_req("Text A", source_file="a.docx"),
+            _make_req("Text B", source_file="b.docx"),
+        ]
+        flagged = annotate_cross_source_duplicates(reqs)
+        self.assertEqual(flagged, 0)
+        for r in reqs:
+            self.assertEqual(r.notes, "")
+
+    def test_cross_file_duplicate_annotated(self) -> None:
+        """Same sentence in two different source files — the second
+        row should pick up a 'Duplicate of <stable_id> (<file>, <row>)'
+        note."""
+        r_a = _make_req(
+            "The User shall authenticate.",
+            source_file="a.docx",
+            primary_actor="User",
+        )
+        r_a.row_ref = "Table 1, Row 3"
+        r_b = _make_req(
+            "The User shall authenticate.",
+            source_file="b.docx",
+            primary_actor="User",
+        )
+        r_b.row_ref = "Table 2, Row 1"
+        flagged = annotate_cross_source_duplicates([r_a, r_b])
+        self.assertEqual(flagged, 1)
+        self.assertEqual(r_a.notes, "")
+        self.assertIn("Duplicate of", r_b.notes)
+        self.assertIn(r_a.stable_id, r_b.notes)
+        self.assertIn("a.docx", r_b.notes)
+        self.assertIn("Table 1, Row 3", r_b.notes)
+
+    def test_different_actors_not_duplicates(self) -> None:
+        # Same text but different primary actors — NOT a duplicate.
+        # Actor is part of the identity.
+        r_a = _make_req(
+            "The target shall be acquired.",
+            primary_actor="Operator",
+        )
+        r_b = _make_req(
+            "The target shall be acquired.",
+            primary_actor="Supervisor",
+        )
+        flagged = annotate_cross_source_duplicates([r_a, r_b])
+        self.assertEqual(flagged, 0)
+        self.assertEqual(r_b.notes, "")
+
+    def test_whitespace_and_case_insensitive(self) -> None:
+        # Cosmetic differences must not prevent a match — otherwise
+        # formatting-only edits would mask a real duplicate.
+        r_a = _make_req("The User shall authenticate.", source_file="a.docx")
+        r_b = _make_req(
+            "  The  user   SHALL authenticate.  ",
+            source_file="b.docx",
+        )
+        flagged = annotate_cross_source_duplicates([r_a, r_b])
+        self.assertEqual(flagged, 1)
+        self.assertIn("Duplicate of", r_b.notes)
+
+    def test_preserves_existing_notes(self) -> None:
+        r_a = _make_req("Text X", source_file="a.docx")
+        r_b = _make_req("Text X", source_file="b.docx")
+        r_b.notes = "Soft language — verify with author."
+        annotate_cross_source_duplicates([r_a, r_b])
+        self.assertIn("Soft language", r_b.notes)
+        self.assertIn("Duplicate of", r_b.notes)
+        self.assertGreaterEqual(r_b.notes.count("\n"), 1)
+
+    def test_multi_way_duplicate_points_to_first(self) -> None:
+        # Three rows with the same (actor, text).  Rows 2 and 3 both
+        # point back to Row 1, not to each other.
+        reqs = [
+            _make_req("Text Y", source_file="a.docx"),
+            _make_req("Text Y", source_file="b.docx"),
+            _make_req("Text Y", source_file="c.docx"),
+        ]
+        flagged = annotate_cross_source_duplicates(reqs)
+        self.assertEqual(flagged, 2)
+        self.assertEqual(reqs[0].notes, "")
+        for later in reqs[1:]:
+            self.assertIn(reqs[0].stable_id, later.notes)
+
+    def test_empty_text_rows_ignored(self) -> None:
+        # Defensive: an empty-text row must not poison the seen-map
+        # for every subsequent empty-text row.
+        reqs = [
+            _make_req("", source_file="a.docx"),
+            _make_req("", source_file="b.docx"),
+        ]
+        flagged = annotate_cross_source_duplicates(reqs)
+        self.assertEqual(flagged, 0)
 
 
 if __name__ == "__main__":

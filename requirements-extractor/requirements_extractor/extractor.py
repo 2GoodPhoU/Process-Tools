@@ -13,11 +13,34 @@ from .models import (
     ExtractionStats,
     Requirement,
     RequirementEvent,
+    annotate_cross_source_duplicates,
     ensure_unique_stable_ids,
+)
+from .legacy_formats import (
+    LibreOfficeUnavailable,
+    PdfSupportUnavailable,
+    prepare_for_parser,
 )
 from .parser import parse_docx_events
 from .statement_set import write_statement_set
 from .writer import write_requirements
+from .reqif_writer import (
+    SUPPORTED_DIALECTS as REQIF_SUPPORTED_DIALECTS,
+    write_requirements_reqif,
+)
+from .writers_extra import write_requirements_json, write_requirements_md
+
+
+#: Supported extra-format labels for ``extract_from_files(emit_extra=...)``.
+#: Kept alongside the two writers so new formats only need one place to
+#: register.  ReqIF's dialect is controlled by the ``reqif_dialect``
+#: kwarg, not by format name — keeps the output extension as ``.reqif``
+#: regardless of dialect.
+EXTRA_FORMAT_WRITERS = {
+    "json": write_requirements_json,
+    "md": write_requirements_md,
+    "reqif": write_requirements_reqif,
+}
 
 
 @dataclass
@@ -27,6 +50,14 @@ class ExtractionResult:
     output_path: Optional[Path] = None
     statement_set_path: Optional[Path] = None
     dry_run: bool = False
+    #: Extra format → written path.  Populated when the caller passes
+    #: ``emit_extra`` to :func:`extract_from_files`.  Empty dict when
+    #: only the default xlsx was emitted.
+    extra_output_paths: dict = None  # type: ignore[assignment]
+
+    def __post_init__(self) -> None:
+        if self.extra_output_paths is None:
+            self.extra_output_paths = {}
 
 
 class ExtractionCancelled(RuntimeError):
@@ -52,6 +83,8 @@ def extract_from_files(
     file_progress: Optional[Callable[[int, int, str], None]] = None,
     cancel_check: Optional[Callable[[], bool]] = None,
     dry_run: bool = False,
+    emit_extra: Optional[Sequence[str]] = None,
+    reqif_dialect: str = "basic",
 ) -> ExtractionResult:
     """Parse every .docx in `input_paths` and write results.
 
@@ -158,12 +191,19 @@ def extract_from_files(
             stats.errors.append(f"File not found: {path}")
             log(f"WARNING: {stats.errors[-1]}")
             continue
-        if path.suffix.lower() != ".docx":
-            stats.errors.append(f"Skipping non-.docx file: {path.name}")
+        suffix = path.suffix.lower()
+        if suffix not in {".docx", ".doc", ".pdf"}:
+            stats.errors.append(
+                f"Skipping unsupported file: {path.name} "
+                f"(expected .docx, .doc, or .pdf)"
+            )
             log(f"WARNING: {stats.errors[-1]}")
             continue
 
         # Per-doc config discovery happens here so each file can override.
+        # We pass the original path so ``<stem>.reqx.yaml`` lookups work
+        # against the authored document regardless of whether we'll
+        # actually parse a converted temp copy below.
         try:
             cfg: Config = resolve_config(
                 run_config_path=run_config_path,
@@ -179,9 +219,34 @@ def extract_from_files(
 
         log(f"Parsing {path.name} (config: {cfg.source}) ...")
         try:
-            events = parse_docx_events(
-                path, resolver_fn=resolver.resolve, config=cfg,
+            # Legacy-format routing: .doc and .pdf get converted to a
+            # temp .docx via ``prepare_for_parser``.  .docx files go
+            # through unchanged (no tempdir allocated).  The context
+            # manager owns cleanup on both the success and error paths.
+            with prepare_for_parser(path) as ready_path:
+                events = parse_docx_events(
+                    ready_path, resolver_fn=resolver.resolve, config=cfg,
+                )
+            # Re-stamp source_file on every emitted requirement so the
+            # output reports the original input name (``spec.doc`` /
+            # ``spec.pdf``) rather than the tempdir path the parser
+            # actually read.
+            if path.suffix.lower() != ".docx":
+                for ev in events:
+                    if isinstance(ev, RequirementEvent):
+                        ev.requirement.source_file = path.name
+        except LibreOfficeUnavailable as e:
+            stats.errors.append(
+                f"Cannot read {path.name}: {e}"
             )
+            log(f"WARNING: {stats.errors[-1]}")
+            continue
+        except PdfSupportUnavailable as e:
+            stats.errors.append(
+                f"Cannot read {path.name}: {e}"
+            )
+            log(f"WARNING: {stats.errors[-1]}")
+            continue
         except Exception as e:  # noqa: BLE001 — per-file: keep going on next doc
             stats.errors.append(f"Error parsing {path.name}: {e}")
             log(f"ERROR: {stats.errors[-1]}")
@@ -206,6 +271,15 @@ def extract_from_files(
     # rows get ``-1``/``-2`` suffixes in first-seen order.
     ensure_unique_stable_ids(all_reqs)
 
+    # Cross-source dedup — flag later occurrences of the same
+    # (actor, text) pair with a "Duplicate of …" note.  Intra-file
+    # duplicates are already handled by the stable-ID suffixing above;
+    # this pass catches the common "boilerplate shared across specs"
+    # case (REVIEW §1.10) where two files have byte-identical rows.
+    dup_count = annotate_cross_source_duplicates(all_reqs)
+    if dup_count:
+        log(f"Flagged {dup_count} cross-source duplicate row(s).")
+
     if dry_run:
         log(f"Dry run: parsed {len(all_reqs)} requirements; no files written.")
         return ExtractionResult(
@@ -226,9 +300,42 @@ def extract_from_files(
         write_statement_set(events_per_file, stmt_path)
         log(f"Wrote statement-set CSV to {stmt_path}.")
 
+    # Optional extra-format emissions (JSON, Markdown, ReqIF).  Each
+    # extra format lands alongside the xlsx at ``<stem>.<ext>``.
+    # Unknown format labels produce a warning but don't abort the run.
+    # ReqIF uses ``reqif_dialect`` to pick a flavour (basic / cameo /
+    # doors); see :mod:`reqif_writer` for the dialect differences.
+    if reqif_dialect not in REQIF_SUPPORTED_DIALECTS:
+        stats.errors.append(
+            "Unknown --reqif-dialect: " + repr(reqif_dialect) + ". "
+            "Known: " + repr(list(REQIF_SUPPORTED_DIALECTS)) + ". "
+            "Falling back to 'basic'."
+        )
+        log("WARNING: " + stats.errors[-1])
+        reqif_dialect = "basic"
+
+    extra_paths = {}
+    for fmt in (emit_extra or ()):
+        writer_fn = EXTRA_FORMAT_WRITERS.get(fmt)
+        if writer_fn is None:
+            stats.errors.append(
+                "Unknown --emit format: " + repr(fmt) + ". "
+                "Known: " + repr(sorted(EXTRA_FORMAT_WRITERS))
+            )
+            log("WARNING: " + stats.errors[-1])
+            continue
+        extra_out = output_path.with_suffix("." + fmt)
+        if fmt == "reqif":
+            writer_fn(all_reqs, extra_out, dialect=reqif_dialect)
+        else:
+            writer_fn(all_reqs, extra_out)
+        log("Wrote " + fmt.upper() + " to " + str(extra_out) + ".")
+        extra_paths[fmt] = extra_out
+
     return ExtractionResult(
         requirements=all_reqs,
         stats=stats,
         output_path=output_path,
         statement_set_path=stmt_path,
+        extra_output_paths=extra_paths,
     )

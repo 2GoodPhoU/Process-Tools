@@ -75,6 +75,56 @@ def ensure_unique_stable_ids(requirements: List["Requirement"]) -> None:
         seen[base] = count + 1
 
 
+def annotate_cross_source_duplicates(requirements: List["Requirement"]) -> int:
+    """Flag requirements that share ``(primary_actor, text)`` with an
+    earlier-appearing row in the corpus.
+
+    REVIEW §1.10: the same boilerplate often shows up in multiple spec
+    files — a company-standard paragraph copied across documents, a
+    shared compliance clause, etc.  Today those come through the
+    extractor as N independent rows and a reviewer has to notice the
+    duplication manually.  This pass appends a ``Duplicate of <stable_id>
+    (<source_file>, <row_ref>)`` line to the ``notes`` column of every
+    duplicate except the first, so triage is mechanical.
+
+    Matching is cross-source on purpose: two rows with the same actor
+    and text but from different files are the interesting case.  Within
+    a single source file we already have :func:`ensure_unique_stable_ids`
+    which suffixes the duplicates.  The dedup key is whitespace-
+    collapsed and case-folded (via :func:`_normalise_for_hash`) so
+    cosmetic differences don't cause a boilerplate pair to look unique.
+
+    Returns the number of rows that were newly flagged.  Pure function
+    over the input list — the caller decides when in the pipeline to
+    run it (for the Excel pipeline that's right after stable-ID
+    assignment; see :func:`extractor.extract_from_files`).
+    """
+    seen: dict[tuple, "Requirement"] = {}
+    flagged = 0
+    for req in requirements:
+        actor_norm = _normalise_for_hash(req.primary_actor or "")
+        text_norm = _normalise_for_hash(req.text or "")
+        if not text_norm:
+            # Empty-text rows shouldn't happen but guard anyway — we
+            # don't want a single "" row to poison the map for every
+            # subsequent empty-text row.
+            continue
+        key = (actor_norm, text_norm)
+        original = seen.get(key)
+        if original is None:
+            seen[key] = req
+            continue
+        # Duplicate of an earlier row.  Point to the first-seen row's
+        # stable_id and source so reviewers can hop there directly.
+        note = (
+            f"Duplicate of {original.stable_id} "
+            f"({original.source_file}, {original.row_ref})."
+        )
+        req.notes = f"{req.notes}\n{note}".strip() if req.notes else note
+        flagged += 1
+    return flagged
+
+
 @dataclass
 class Requirement:
     """One extracted requirement row."""
@@ -93,7 +143,7 @@ class Requirement:
     confidence: str                     # "High" | "Medium" | "Low"
     notes: str = ""                     # free-text flags for reviewers
     polarity: str = "Positive"          # "Positive" | "Negative" (shall-not etc.)
-    stable_id: str = ""                 # "REQ-<8hex>" — survives upstream content churn
+    stable_id: str = ""                 # "REQ-<8hex>" - survives upstream content churn
 
     @property
     def secondary_actors_str(self) -> str:
@@ -114,7 +164,7 @@ class ExtractionStats:
 
 
 # ---------------------------------------------------------------------------
-# Document events — a lightweight ordered stream used by writers that need
+# Document events - a lightweight ordered stream used by writers that need
 # structural context (e.g. the statement-set CSV exporter).  The Excel writer
 # only needs RequirementEvent values, so it can filter the stream.
 # ---------------------------------------------------------------------------

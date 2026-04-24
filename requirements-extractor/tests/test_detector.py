@@ -16,6 +16,7 @@ from requirements_extractor.detector import (
     SOFT_KEYWORDS,
     KeywordMatcher,
     classify,
+    compute_confidence,
     split_sentences,
 )
 
@@ -317,6 +318,128 @@ class TestNegationDetection(unittest.TestCase):
     def test_bare_not_without_modal(self) -> None:
         """'not' alone — with no modal nearby — is not a requirement negation."""
         self.assertFalse(self.m.is_negative("This is not tracked in JIRA."))
+
+
+
+# ---------------------------------------------------------------------------
+# compute_confidence (REVIEW §1.9) — length baseline with
+# vague-qualifier and measurable-clause adjustments.
+# ---------------------------------------------------------------------------
+
+
+class TestComputeConfidenceBaseline(unittest.TestCase):
+    """Length-only baseline: 5-60 words High, <5 Low, >60 Medium."""
+
+    def test_medium_length_is_high(self) -> None:
+        # 10 words, no vague qualifiers, no measurable clause.
+        text = "The system shall validate the token before granting any access."
+        self.assertEqual(compute_confidence(text), "High")
+
+    def test_very_short_is_low(self) -> None:
+        # <5 words — too short to be useful on its own.
+        self.assertEqual(compute_confidence("Shall run."), "Low")
+
+    def test_very_long_is_medium(self) -> None:
+        # >60 words — usually over-specified, downgrade to Medium.
+        text = " ".join(["word"] * 80)
+        self.assertEqual(compute_confidence(text), "Medium")
+
+
+class TestConfidenceVagueDowngrade(unittest.TestCase):
+    """Vague qualifiers shift confidence one step down from the
+    length-based baseline."""
+
+    def test_reasonable_downgrades(self) -> None:
+        text = "The system shall respond in a reasonable amount of time to queries."
+        # Baseline would be High; vague 'reasonable' drops to Medium.
+        self.assertEqual(compute_confidence(text), "Medium")
+
+    def test_appropriate_downgrades(self) -> None:
+        text = "The system shall produce an appropriate response to all inputs."
+        self.assertEqual(compute_confidence(text), "Medium")
+
+    def test_where_practical_downgrades(self) -> None:
+        text = "The system shall log every request where practical to do so."
+        self.assertEqual(compute_confidence(text), "Medium")
+
+    def test_short_vague_goes_to_low(self) -> None:
+        # Baseline Low + downgrade = still Low (clamped).
+        self.assertEqual(compute_confidence("Shall be appropriate."), "Low")
+
+
+class TestConfidenceMeasurableUpgrade(unittest.TestCase):
+    """A measurable clause shifts confidence one step up."""
+
+    def test_short_measurable_goes_to_medium(self) -> None:
+        # Baseline Low (<5 words); measurable clause lifts to Medium.
+        text = "Response below 200 ms."
+        self.assertEqual(compute_confidence(text), "Medium")
+
+    def test_time_unit_upgrade_from_medium_baseline(self) -> None:
+        # 70-word sentence (Medium baseline) with a time threshold →
+        # measurable clause shifts to High.
+        long_pad = " ".join(["word"] * 65)
+        text = f"The system shall respond within 250 ms. {long_pad}"
+        # Baseline Medium (length > 60) + measurable = High.
+        self.assertEqual(compute_confidence(text), "High")
+
+    def test_tolerance_counts_as_measurable(self) -> None:
+        text = "Temperature shall stay within ± 5 C of nominal."
+        # Baseline Low (6 words roughly), + measurable → Medium.
+        self.assertEqual(compute_confidence(text), "High")
+
+    def test_at_most_counts(self) -> None:
+        text = "The system shall reboot at most 3 times per day on any node."
+        # Baseline High (13 words); +measurable stays High (clamped).
+        self.assertEqual(compute_confidence(text), "High")
+
+
+class TestConfidenceSignalsCancel(unittest.TestCase):
+    """A sentence with both vague and measurable signals lands back at
+    the length-based baseline (the two offsets cancel)."""
+
+    def test_both_signals_cancel(self) -> None:
+        # Baseline High + -1 (vague) + 1 (measurable) = baseline.
+        text = "Response within 500 ms where practical on the target network."
+        self.assertEqual(compute_confidence(text), "High")
+
+
+class TestClassifyRoutesThroughNewConfidence(unittest.TestCase):
+    """The existing Hard / Soft classification paths should now use
+    the upgraded confidence helper without changing their classification."""
+
+    def test_hard_with_measurable_is_high(self) -> None:
+        m = KeywordMatcher.default()
+        req_type, _, conf = m.classify(
+            "The system shall respond within 200 ms to every valid request."
+        )
+        self.assertEqual(req_type, "Hard")
+        self.assertEqual(conf, "High")
+
+    def test_hard_with_vague_drops(self) -> None:
+        m = KeywordMatcher.default()
+        req_type, _, conf = m.classify(
+            "The system shall produce appropriate output under normal conditions."
+        )
+        self.assertEqual(req_type, "Hard")
+        # Baseline High → -1 → Medium.
+        self.assertEqual(conf, "Medium")
+
+    def test_soft_baseline_still_medium(self) -> None:
+        m = KeywordMatcher.default()
+        req_type, _, conf = m.classify(
+            "The system should attempt to keep connections alive."
+        )
+        self.assertEqual(req_type, "Soft")
+        self.assertEqual(conf, "Medium")
+
+    def test_soft_with_measurable_goes_high(self) -> None:
+        m = KeywordMatcher.default()
+        req_type, _, conf = m.classify(
+            "The system should respond within 100 ms to pings."
+        )
+        self.assertEqual(req_type, "Soft")
+        self.assertEqual(conf, "High")
 
 
 if __name__ == "__main__":

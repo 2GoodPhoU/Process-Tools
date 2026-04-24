@@ -106,6 +106,7 @@ SUBCOMMAND_NAMES = frozenset({
     # canonical names
     "requirements",
     "actors",
+    "diff",
     # aliases — keep in sync with ``aliases=[...]`` on each add_parser call
     "reqs",
     "scan",
@@ -306,6 +307,40 @@ def build_parser() -> argparse.ArgumentParser:
             "summary.  Pairs well with --dry-run for quick sanity checks."
         ),
     )
+    p_req.add_argument(
+        "--emit",
+        dest="emit",
+        type=str,
+        default="",
+        metavar="FORMATS",
+        help=(
+            "Comma-separated list of extra output formats to emit "
+            "alongside the primary .xlsx.  Supported: json (flat array "
+            "of requirement objects, one per row), md (compact "
+            "Markdown table — useful for PR reviews), reqif (ReqIF 1.2 "
+            "XML for import into JAMA / DOORS / Cameo / Polarion).  "
+            "Each format lands at <output-stem>.<ext> next to the "
+            "xlsx.  Example: --emit json,md,reqif"
+        ),
+    )
+    p_req.add_argument(
+        "--reqif-dialect",
+        dest="reqif_dialect",
+        type=str,
+        default="basic",
+        choices=("basic", "cameo", "doors"),
+        help=(
+            "Only relevant with ``--emit reqif``.  Picks the ReqIF "
+            "dialect to produce: ``basic`` (tool-agnostic, imports "
+            "cleanly in every tool we've tested — default), ``cameo`` "
+            "(adds Cameo-friendly LONG-NAME conventions and "
+            "enumerated Type/Polarity), ``doors`` (adds a "
+            "ReqIF.ForeignID for the stable_id, ReqIF.ChapterName "
+            "for the heading trail, and an explicit "
+            "SPECIFICATION-TYPE so the DOORS import wizard doesn't "
+            "prompt for one)."
+        ),
+    )
 
     # actors ------------------------------------------------------------- #
     p_actors = sub.add_parser(
@@ -342,6 +377,51 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
 
+    # diff --------------------------------------------------------------- #
+    p_diff = sub.add_parser(
+        "diff",
+        help="Diff two extractor-produced workbooks.",
+        description=(
+            "Compare two requirements workbooks (from prior runs of "
+            "'requirements' mode) and emit a colour-coded Diff.xlsx "
+            "that highlights Added / Removed / Changed rows.  Matches "
+            "primarily by stable ID; secondary match on (source file, "
+            "row ref) catches text edits at the same document position.\n"
+            "\n"
+            "IMPORTANT: Both input workbooks must have been produced "
+            "from .docx files with the SAME filename for the diff to "
+            "match rows correctly.  The stable ID hashes "
+            "(source_file, primary_actor, text), so diffing "
+            "spec_v1.xlsx (from spec.docx) against spec_v2.xlsx (from "
+            "spec_v2.docx) will show every row as Added+Removed "
+            "because the stable IDs differ even when the content is "
+            "identical.  Workflow: keep the source .docx filename "
+            "stable between runs and overwrite the xlsx, OR rename "
+            "the 'new' .docx to match the 'old' before re-extracting."
+        ),
+        epilog=(
+            "Examples:\n"
+            "  # Right way: same source filename, extracted twice over time\n"
+            "  document-data-extractor requirements spec.docx -o old.xlsx\n"
+            "  # ...edits happen to spec.docx...\n"
+            "  document-data-extractor requirements spec.docx -o new.xlsx\n"
+            "  document-data-extractor diff old.xlsx new.xlsx -o diff.xlsx\n"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p_diff.add_argument(
+        "old", type=Path,
+        help="The older (baseline) requirements .xlsx.",
+    )
+    p_diff.add_argument(
+        "new", type=Path,
+        help="The newer (candidate) requirements .xlsx.",
+    )
+    p_diff.add_argument(
+        "-o", "--output", type=Path, default=None,
+        help="Output .xlsx path.  Defaults to 'diff.xlsx' in CWD.",
+    )
+
     return parser
 
 
@@ -371,6 +451,15 @@ def main(argv: Optional[List[str]] = None) -> int:
     def summary(msg: str) -> None:
         if not args.no_summary:
             print(msg)
+
+    # Diff mode doesn't take .docx inputs — short-circuit before the
+    # _collect_docx call so the "no .docx files" error doesn't fire.
+    if getattr(args, "mode", None) == "diff":
+        try:
+            return _run_diff(args, summary)
+        except KeyboardInterrupt:
+            print("\nInterrupted.", file=sys.stderr)
+            return 130
 
     inputs = _collect_docx(args.inputs)
     if not inputs:
@@ -442,6 +531,10 @@ def _run_requirements(
     if auto_actors:
         effective_actors = _harvest_auto_actors(args, inputs, output_path, progress)
 
+    # Parse --emit comma-separated list (empty string -> no extras).
+    emit_raw = getattr(args, "emit", "") or ""
+    emit_extra = [f.strip() for f in emit_raw.split(",") if f.strip()]
+
     result = extract_from_files(
         input_paths=inputs,
         output_path=output_path,
@@ -452,6 +545,8 @@ def _run_requirements(
         keywords_path=args.keywords,
         progress=progress,
         dry_run=dry_run,
+        emit_extra=None if dry_run else emit_extra,
+        reqif_dialect=getattr(args, "reqif_dialect", "basic"),
     )
     summary("")
     summary("==== Summary ====" + ("  [dry run — no files written]" if dry_run else ""))
@@ -469,23 +564,47 @@ def _run_requirements(
         summary(f"Statement-set CSV:    {result.statement_set_path}")
     if dry_run and args.statement_set is not None:
         summary(f"Statement-set CSV:    (skipped — dry run) {args.statement_set}")
-
-    if show_samples > 0 and result.requirements:
-        summary("")
-        summary(f"First {min(show_samples, len(result.requirements))} sample(s):")
-        for req in result.requirements[:show_samples]:
-            # One-line preview; truncate long requirement text so the
-            # terminal doesn't wrap aggressively.
+    for fmt, path in (result.extra_output_paths or {}).items():
+        summary(f"{fmt.upper():<22s}{path}")
+    if show_samples and result.requirements:
+        shown = min(show_samples, len(result.requirements))
+        summary(f"\nFirst {shown} sample(s):")
+        for req in result.requirements[:shown]:
             text = req.text if len(req.text) <= 110 else req.text[:107] + "..."
             summary(f"  {req.stable_id}  [{req.req_type}] {req.primary_actor}: {text}")
     return EXIT_OK
 
 
-def _run_actors(
-    args, inputs: List[Path], progress, summary,
-) -> int:
-    """Actors-mode dispatch."""
+def _run_diff(args, summary) -> int:
+    """Diff-mode dispatch — thin wrapper around diff.diff_workbooks."""
+    from .diff import diff_workbooks
+    old_path = Path(args.old)
+    new_path = Path(args.new)
+    for p, label in ((old_path, "old"), (new_path, "new")):
+        if not p.exists():
+            print(f"Error: {label} workbook not found: {p}", file=sys.stderr)
+            return EXIT_RUNTIME
+    out_path = Path(args.output) if args.output else Path("diff.xlsx")
+    try:
+        out_path, counts = diff_workbooks(old_path, new_path, out_path)
+    except (OSError, ValueError) as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return EXIT_RUNTIME
+    summary("")
+    summary("==== Diff Summary ====")
+    summary(f"Old:      {old_path}")
+    summary(f"New:      {new_path}")
+    summary(f"Added:    {counts['Added']}")
+    summary(f"Removed:  {counts['Removed']}")
+    summary(f"Changed:  {counts['Changed']}")
+    summary(f"Output:   {out_path}")
+    return EXIT_OK
+
+
+def _run_actors(args, inputs, progress, summary) -> int:
+    """Actors-mode dispatch — produces a canonical actor-list workbook."""
     output_path = args.output or Path("actors_scan.xlsx")
+
     result = scan_actors_from_files(
         input_paths=inputs,
         output_path=output_path,
@@ -496,17 +615,17 @@ def _run_actors(
         progress=progress,
     )
     summary("")
-    summary("==== Actor scan summary ====")
-    summary(f"Files processed:   {result.stats.files_processed}")
-    summary(f"Observations:      {result.stats.observations}")
-    summary(f"Actor groups:      {result.stats.groups}")
+    summary("==== Summary ====")
+    summary(f"Files processed:      {result.stats.files_processed}")
+    summary(f"Actors found:         {result.stats.groups}")
+    summary(f"Observations:         {result.stats.observations}")
     if result.stats.errors:
-        summary(f"Warnings/Errors:   {len(result.stats.errors)}")
+        summary(f"Warnings/Errors:      {len(result.stats.errors)}")
         for err in result.stats.errors:
             summary(f"  - {err}")
-    summary(f"Output:            {result.output_path}")
+    summary(f"Output:               {result.output_path}")
     return EXIT_OK
 
 
-if __name__ == "__main__":
-    raise SystemExit(main())
+if __name__ == "__main__":  # pragma: no cover
+    sys.exit(main())
