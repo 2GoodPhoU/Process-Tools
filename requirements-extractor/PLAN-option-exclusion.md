@@ -1,3 +1,16 @@
+> **STATUS: DISCHARGED (2026-04-24).**
+> The hard-disable variant shipped in `gui.py` — centralised
+> `_update_option_state()` helper, delegated through from
+> `_on_mode_change`, and the pre-run validation messagebox in `_run`
+> that hard-blocks a requirements run with no secondary-actor source.
+> The pure guard lives in `gui_state.has_secondary_actor_source` so
+> it's unit-testable without a Tk root. Tests in
+> `tests/test_gui_state.py::TestHasSecondaryActorSource` (6 tests).
+> Kept in-tree for the design rationale; the implementation won't
+> be re-derived.
+
+---
+
 # Plan — option-exclusion and pre-run validation
 
 FIELD_NOTES §3. The GUI currently lets the user launch a run that cannot

@@ -12,6 +12,7 @@ Matches the voice of `REVIEW.md` — no implementation here, just what was seen 
 
 **Category:** Environmental constraint + accuracy issue
 **Severity:** Blocker (highest priority — blocks real-world use on the target network)
+**Status (2026-04-24):** Path (a) selected — PyInstaller bundle with spaCy + `en_core_web_sm` 3.7.1 pre-baked. All build scaffolding landed: NLP pins active in `packaging/build-requirements.txt`, pinned model-wheel URL in the build recipe, step-by-step smoke-test runbook at `docs/NLP_BUNDLE_SMOKE_TEST.md`. Final validation is the manual build + work-network smoke test (Eric to run).
 
 Actor-ID depends heavily on NLP being present. The work network where the tool is actually used does not have NLP available (model/dependency not installable through the network's package path). Without NLP, actor extraction accuracy drops to the point where output is not trustworthy. Rule-based / regex fallback alone isn't carrying the load on real documents.
 
@@ -32,6 +33,7 @@ Actor-ID depends heavily on NLP being present. The work network where the tool i
 
 **Category:** UX bug
 **Severity:** Minor (first-run friction, not a blocker)
+**Status (2026-04-24):** ✅ Tier-1 fix shipped. `ExtractorApp._fit_window_to_content()` runs after `_build_ui()`, measures the layout's requested size, and grows the saved geometry to fit (never shrinks). `GuiSettings.window_geometry` default bumped from `760x560` to `900x760`. `minsize` pinned from the packed layout so the handle can't clip it. Regression tests in `tests/test_gui_state.py::TestWindowGeometryBump`. Tier-2 (scrollable canvas) deferred until field data says it's needed.
 
 On launch, only roughly half of the GUI is visible. The rest of the controls are hidden below / beside the visible area until the user manually resizes the window. There's no visible indication that the window is resizable or that there's more content hidden — a new user could easily assume what they see is the whole tool.
 
@@ -115,6 +117,7 @@ Tier 2 touches layout in ~10 places and is worth deferring until Tier 1 lands an
 
 **Category:** Feature gap / UX correctness
 **Severity:** Major (produces silently-useless runs)
+**Status (2026-04-24):** ✅ Shipped (hard-disable variant). Centralised `_update_option_state()` in `gui.py` greys out req-only options in actors mode and force-resets their booleans so flipping modes is never a surprise. Pre-run validation messagebox in `_run` hard-blocks a requirements run with no secondary-actor source, listing the three ways to fix it. Guard is a pure function (`gui_state.has_secondary_actor_source`) covered by `tests/test_gui_state.py::TestHasSecondaryActorSource`.
 
 The UI lets users run the tool in configurations that cannot produce useful output. Two specific cases observed:
 
@@ -139,6 +142,7 @@ The UI should enforce a minimal valid option set: disable / gray out dependent o
 
 **Category:** Test blocker / test-infrastructure gap
 **Severity:** Major (supporting workstream — unblocks reliable testing of everything above)
+**Status (2026-04-24):** ✅ Shipped — four new `procedural_*.docx` fixtures in `samples/procedures/` (plus paired `.reqx.yaml` configs) reproduce the failure modes observed on the work network: header-signal requirements without keywords, blank-actor continuation, multi-actor-cell resolution, bulleted/numbered list rows. Four parser changes (1a/1b/1c/1d) landed to handle them, with 36 regression tests in `tests/test_procedural_tables.py` pinning each case. Mixed-language and very-long stress fixtures still on the backlog.
 
 The real documents Eric runs the tool on are controlled and can't be shared or committed. This means none of them can be used to seed automated tests or fixtures, and the current `samples/` and `test_data/` content only covers a narrow slice of what shows up in practice.
 
@@ -164,6 +168,7 @@ Need a set of hand-authored synthetic documents that:
 
 **Category:** UX gap
 **Severity:** Minor (polish, comes after the blockers above)
+**Status (2026-04-24):** ✅ All three surfaces shipped. Help menu (Getting started… / Open README / About), first-run modal in `gui_help.GettingStartedDialog` (dismissible-forever via `GuiSettings.onboarding_seen`), and hover-tooltips on the four non-obvious checkboxes (NLP, dry-run, auto-actors, statement-set). Persistence tested in `tests/test_gui_state.py::TestOnboardingSeen`.
 
 The tool has no startup guide, tooltip, or in-app help. First-time users — and returning users coming back after time away — have to infer what each option does from context and the README. That's fine for the author; it's friction for anyone else on the team, and for Eric himself on re-entry.
 

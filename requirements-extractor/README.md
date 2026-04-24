@@ -23,7 +23,26 @@ In requirements mode, each row in the output workbook is one requirement, with c
 
 The tool won't catch 100% of requirements — wording varies and some items genuinely need a human eye — so soft-language matches are highlighted in yellow for review. You can tune the keyword lists in `requirements_extractor/detector.py`.
 
+### A note on tracked changes
+
+`python-docx` (the library this tool uses to read `.docx` files) reads the **post-accept** text from the document's XML — it follows what Word would show with all revisions accepted, regardless of what's actually displayed on screen. In practice that means:
+
+- If a document has **unaccepted tracked changes**, the tool sees the accepted-revision text, not the current on-screen text. Deletions marked for removal are treated as gone; insertions marked for addition are treated as present. Rejected revisions are also followed — the tool sees whatever the underlying XML says is in place.
+- The **safest reviewer workflow** is to accept or reject all tracked changes in your copy of the document *before* running the extractor, so what you see on screen matches what the tool reads.
+- If you need to see what changed between the tracked-changes and accepted versions, run the tool twice — once on the document as-is, once on a copy with all revisions accepted — and diff the outputs. The `document-data-extractor diff` subcommand (see below) does this automatically for two finished `.xlsx` runs.
+- **Comments and inline suggestions** (not tracked changes — the sidebar "comments" feature) are ignored entirely. They live in a separate part of the XML that `python-docx` does not surface.
+
 ---
+
+### Supported input formats
+
+The extractor reads three input formats, in decreasing order of fidelity:
+
+- **`.docx`** — the native target. Tables, headings, nested structure, bullet lists, and tracked-changes state all round-trip losslessly through python-docx. Prefer this whenever the source Word document is available.
+- **`.doc`** (pre-2007 Word Binary Format) — requires LibreOffice installed on the machine running the extractor. The tool shells out to `soffice --headless --convert-to docx` into a temp file, parses the converted copy, and cleans up. If LibreOffice isn't installed you'll see a friendly "install LibreOffice to enable .doc support" message pointing at the install docs for your platform. Install via `brew install --cask libreoffice` on macOS, `sudo apt install libreoffice` on Debian/Ubuntu, or the installer at <https://www.libreoffice.org/download/> on Windows.
+- **`.pdf`** — requires `pdfplumber` (add to `requirements-optional.txt` or `pip install pdfplumber`). Best-effort conversion: extracted tables become Word tables in a synthetic `.docx`, extracted prose becomes paragraphs, and each page is marked with a `-- PDF page N --` comment in the output so reviewers can sanity-check against the original. PDF is inherently lossier than Word — reading order across columns, page headers/footers, and any ASCII art pdfplumber doesn't recognise as a table will all be wrong. Prefer the source Word document when it's available; use PDF as the fallback when it isn't.
+
+Non-`.docx` inputs are converted into a temp file on every run, so you pay the conversion cost each time. The conversion cache is deliberately per-run — it means a fresh source doc is always re-read and nothing stale lingers.
 
 ## Setup from the ground up
 
@@ -401,6 +420,33 @@ The ID is only meant for cross-document referencing in reviews and change-tracki
 
 ---
 
+## Diff mode — track what changed between two runs
+
+```
+document-data-extractor diff old.xlsx new.xlsx -o diff.xlsx
+```
+
+Takes two requirements workbooks produced by prior `requirements` runs and emits a colour-coded third workbook that highlights which rows were **Added** (green), **Removed** (red), or **Changed** (yellow). Changed rows show the previous text alongside the new text so reviewers can scan what edits actually landed.
+
+Matching strategy:
+
+1. Primary match on the stable `ID` column — identical ID in both files means the requirement is unchanged and isn't emitted.
+2. Secondary match on `(Source File, Row Ref)` for rows that don't match by ID — this is what catches text edits at the same document position. The old/new pair becomes a single Changed row.
+3. Rows still unmatched after both passes end up as Removed (old-only) or Added (new-only).
+
+> **Filename sensitivity — read this before you diff.** The stable ID hashes `(source_file, primary_actor, text)`, so changing the source filename between the two runs changes every ID even when the content is identical. Diffing `spec_v1.xlsx` (extracted from `spec_v1.docx`) against `spec_v2.xlsx` (extracted from `spec_v2.docx`) will produce a diff that reports every row as Added + Removed — the matcher can't recognise that the content is the same because the IDs differ.
+>
+> Two supported workflows:
+>
+> 1. **Keep the source filename stable between runs.** Overwrite the same `.docx` as it evolves; extract on each version and the IDs line up. This is what the diff subcommand is designed for.
+> 2. **Rename before extracting.** If you received `spec_v2.docx` as a separately-named file, rename it to match the original filename (`cp spec_v2.docx working/spec.docx`) before running the extractor, then run diff on the two resulting xlsxs.
+>
+> The secondary match on `(Source File, Row Ref)` is what flags text edits as Changed — it only fires when the source filename is identical in both workbooks. Different filenames bypass it and the diff falls through to Removed + Added.
+
+The subcommand's `--help` carries a short-form version of this note.
+
+---
+
 ## Dry run
 
 `--dry-run` on a requirements invocation runs the full parse + detect + ID-assignment pipeline and prints the usual summary, but skips writing the Excel workbook and any statement-set CSV. It pairs well with `--show-samples N`, which prints the first N detected requirements as a one-line preview:
@@ -509,28 +555,44 @@ Most tuning should happen through a **config file** (see the "Config file" secti
 
 ```
 requirements-extractor/                (folder name — Python pkg kept for compat)
-├── README.md                          (this file)
+├── README.md                          (this file — user-facing guide)
+├── REVIEW.md                          (architecture review + status)
+├── FIELD_NOTES.md                     (field-testing observations + status)
+├── PLAN-*.md                          (design plans, all DISCHARGED)
 ├── requirements.txt                   (core Python deps)
-├── requirements-optional.txt          (optional spaCy deps)
+├── requirements-optional.txt          (spaCy for NLP, tkinterdnd2 for GUI drag-drop, pdfplumber for PDF)
 ├── extract.py                         (CLI shortcut — legacy flag-style still works)
 ├── run_gui.py                         (GUI shortcut)
+├── docs/                              (design and runbook docs)
+│   ├── PROJECT_OVERVIEW.md            (re-onboarding doc for future Claude sessions)
+│   ├── NLP_BUNDLE_SMOKE_TEST.md       (PyInstaller build + verification runbook)
+│   └── SESSION_STATUS.md              (session-level changelog)
 ├── packaging/                         (PyInstaller build config)
 │   ├── DocumentDataExtractor.spec
 │   ├── build.bat                      (Windows build)
 │   ├── build.sh                       (macOS/Linux build)
 │   └── build-requirements.txt
 ├── samples/                           (sample files for testing)
+│   ├── edge_cases/                    (5 fixtures for parser/config edge cases)
+│   └── procedures/                    (11 fixtures for actor-ID failure modes)
+├── tests/                             (unittest suite, 427 tests)
 └── requirements_extractor/            (Python package — import path unchanged)
     ├── __init__.py
-    ├── models.py                      (dataclasses + event types)
-    ├── detector.py                    (hard/soft keyword classifier)
-    ├── actors.py                      (primary + secondary actor resolution)
+    ├── models.py                      (dataclasses + event types + dedup helpers)
+    ├── detector.py                    (hard/soft classifier + confidence heuristic)
+    ├── actors.py                      (primary + secondary actor resolution + NER canonicalisation)
     ├── actor_scan.py                  (actors-only extraction mode)
-    ├── parser.py                      (walks the .docx into an event stream)
-    ├── writer.py                      (writes the .xlsx output)
+    ├── parser.py                      (walks the .docx into an event stream — incl. procedural-table detection)
+    ├── legacy_formats.py              (.doc via LibreOffice, .pdf via pdfplumber)
+    ├── writer.py                      (writes the primary .xlsx output)
+    ├── writers_extra.py               (JSON + Markdown extra writers)
+    ├── reqif_writer.py                (ReqIF 1.2 with basic / cameo / doors dialects)
+    ├── json_writer.py, md_writer.py   (compat shims → writers_extra)
+    ├── diff.py                        (diff subcommand — compare two xlsxs)
     ├── statement_set.py               (writes the statement-set .csv output)
     ├── extractor.py                   (orchestrator for requirements mode)
     ├── cli.py                         (subcommand CLI — document-data-extractor)
     ├── gui.py                         (Tkinter GUI)
+    ├── gui_help.py                    (Help menu, first-run modal, tooltips)
     └── gui_state.py                   (Tk-free settings/helpers)
 ```

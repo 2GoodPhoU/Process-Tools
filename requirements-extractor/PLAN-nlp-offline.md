@@ -1,3 +1,22 @@
+> **STATUS: DISCHARGED (2026-04-24).**
+> Option (a) — bundled PyInstaller exe with spaCy + en_core_web_sm
+> baked in — was selected after IT sign-off on a ~250–300 MB
+> single-file exe. The build recipe is live in
+> `packaging/build-requirements.txt` (NLP pins uncommented),
+> `packaging/DocumentDataExtractor.spec` (collect_all already wired),
+> `packaging/build.bat` / `build.sh` (prereq comments updated), and
+> `README.md` (pinned model-wheel URL in the Packaging section).
+> The manual step-by-step smoke-test runbook lives at
+> `docs/NLP_BUNDLE_SMOKE_TEST.md` — run it on your Windows build
+> machine when you're ready to produce the artifact. Option (c) is
+> also documented as the fallback in the README's "Bundling for a
+> restricted network" subsection.
+> This plan is kept in-tree for historical context; don't re-derive
+> it. Flip a fresh plan if a later requirement (e.g. macOS / Linux
+> bundles, different model) warrants a new approach.
+
+---
+
 # Plan — making the NLP path work on the work network
 
 FIELD_NOTES §1. Actor-ID accuracy collapses without NLP, and the work

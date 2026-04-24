@@ -1,3 +1,16 @@
+> **STATUS: DISCHARGED (2026-04-24).**
+> All three surfaces shipped: Help menu ("Getting started…", "Open
+> README", "About"), first-run modal (dismissible-forever via
+> `GuiSettings.onboarding_seen`), and hover-tooltips on the
+> NLP / dry-run / auto-actors / statement-set checkboxes. Dialog and
+> tooltip helper live in the new `gui_help.py` module so the Tk
+> surface stays legible. Tests cover the persistence flag in
+> `tests/test_gui_state.py::TestOnboardingSeen` (4 tests).
+> Kept in-tree for the design rationale; the implementation won't
+> be re-derived.
+
+---
+
 # Plan — onboarding and in-app help
 
 FIELD_NOTES §5. The GUI has no startup guide, tooltips, or in-app
