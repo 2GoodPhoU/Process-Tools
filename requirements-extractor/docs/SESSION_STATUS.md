@@ -1,3 +1,116 @@
+# Session status — 2026-04-24 (Day 2, late evening)
+
+Tonight's pass picked up everything that had been built but never
+committed (essentially the whole prior day's work was sitting in the
+working tree only), then closed the last open REVIEW item and added
+one new feature.  **455 tests passing**, up from 425 reported at end
+of Day 2 EOD.
+
+## Committed (was working tree only)
+
+- `chore: add requirements-extractor/.gitignore` (89dd2d8) —
+  Python/venv/PyInstaller/IDE/OS noise plus root-level scratch
+  outputs the tool writes when run from this folder.
+- `feat: 2026-04-24 work — parser/formats/writers/diff` (e55e783, 35
+  files +4334/-114) — the .doc + .pdf input support, ReqIF dialects,
+  diff subcommand, NER canonicalisation, confidence heuristic
+  upgrade, cross-source dedup, JSON/MD writers, procedural-table
+  parser improvements, the procedure stress fixtures (long_procedure,
+  mixed_language) — all the day's source / test / fixture work in
+  one logical-event commit.
+- `docs: status sweep + project overview + smoke-test runbook`
+  (47b88b3, 9 files +1088/-8) — `docs/PROJECT_OVERVIEW.md` (the
+  re-onboarding doc), `docs/SESSION_STATUS.md` (this changelog),
+  `docs/NLP_BUNDLE_SMOKE_TEST.md` (PyInstaller runbook), plus the
+  REVIEW / FIELD_NOTES / PLAN-* status sweep and the README pass
+  for tracked-changes / diff / supported-formats / project-layout
+  sections.
+
+## §3.8 source-preview column landed (047b270)
+
+Inline-snippet flavour (over the hyperlink alternative — Excel's
+external-hyperlink behaviour is flaky on Office-for-Mac and
+Excel-on-the-web).  New `Context` column (rightmost, preserving
+existing column indexes) + `parser._build_context` snippet builder
++ Requirement model field + ReqIF attribute + JSON via asdict.
+Markdown intentionally omits the column so PR-review tables stay
+compact.  Suppression built in: when context normalises to the same
+string as the requirement (single-sentence paragraph), the column
+collapses to empty so it doesn't waste horizontal space.  280-char
+cap with sentence-friendly truncation (cut at last whitespace,
+append `…`).  13 new tests in `test_source_preview.py`.
+
+## PyInstaller spec pre-flight (2243dfb)
+
+Sandbox-side checks of the build scaffolding before Eric runs the
+manual Windows build:
+
+- `hiddenimports` was missing 10 modules added to the package
+  during the day (legacy_formats, reqif_writer, writers_extra,
+  json_writer, md_writer, diff, gui_help, gui_state, _logging,
+  config).  Now lists all 20 public modules alphabetically with a
+  comment to keep them in sync.
+- `pdfplumber` (with its `pdfminer` transitive) and `tkinterdnd2`
+  weren't bundled — meaning a build venv with those installed
+  wouldn't carry PDF support or drag-and-drop into the exe.
+  Added a second `for _pkg in (...)` block alongside the NLP one,
+  same best-effort treatment (silently skipped when not installed).
+- New "Pre-flight checklist" section appended to
+  `docs/NLP_BUNDLE_SMOKE_TEST.md`: seven sandbox-side steps that
+  catch failures which don't need a Windows build to surface
+  (test suite green, source-tree-vs-spec drift, optional-dep
+  cross-check, build-requirements pin sanity, entry-script
+  existence, spec syntax check, end-to-end CLI smoke).  All seven
+  pass cleanly against HEAD.
+
+## New feature: smart boilerplate auto-skip
+
+`DEFAULT_BOILERPLATE_TITLES` constant in `config.py` (~25 entries
+covering Glossary / Acronyms / References / Revision History /
+Document Control / Table of Contents / Approvals / Distribution /
+Sign-offs / Applicable Documents / etc.) plus a
+`SkipSections.auto_boilerplate: bool = True` toggle that OR-s the
+default list into the existing `matches_title` substring matcher.
+Both the section-row title path (existing) and a new heading-scope
+skip (top-level Heading 1/2/3 → drops requirements until the next
+non-boilerplate heading at the same level or shallower) honour it.
+
+Heading-scope plumbing: `_ParseContext.skip_heading_level: Optional[int]`
+flips on at a matching Heading and clears on the next non-matching
+heading at the same level or shallower.  `_emit_candidate` short-
+circuits to `None` while active.  Clear-then-set order means
+adjacent boilerplate headings (Glossary → Acronyms → References)
+chain correctly without one swallowing the next.
+
+User `titles:` still layered on top, so house-style boilerplate stays
+configurable per project.  Set `auto_boilerplate: false` to disable
+only the defaults (rare — for corpora where a default name happens
+to be a substantive section).  Documented in `samples/sample_config.yaml`,
+the README's Config chapter, and a new REVIEW §3.16 status entry.
+15 tests in `test_boilerplate_skip.py`.
+
+## What's still yours
+
+1. PyInstaller build + work-network smoke test on Eric's Windows
+   machine (runbook at `docs/NLP_BUNDLE_SMOKE_TEST.md`, with the
+   new pre-flight checklist appended).
+2. Real Cameo / DOORS ReqIF import validation — needs the actual
+   tools installed.
+
+REVIEW carryovers list is now empty.  All §1.x / §2.x / §3.x items
+are FIXED or stretch (Cameo / DOORS).
+
+## Baseline
+
+- **455 tests passing, 0 failing.** (425 reported at end of Day 2
+  EOD; +30 this session: 13 source-preview, 15 boilerplate-skip,
+  plus 2 from a no-doc-bump that landed earlier.)
+- 17 modules under `requirements_extractor/`.
+- 4 commits today: 89dd2d8, e55e783, 47b88b3, 047b270, 2243dfb,
+  plus a sixth pending for the boilerplate skip.
+
+---
+
 # Session status — 2026-04-24 (Day 2, end-of-day)
 
 Final pass after the test-session findings. Two follow-ups addressed

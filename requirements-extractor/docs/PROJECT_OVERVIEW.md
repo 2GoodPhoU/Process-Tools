@@ -232,10 +232,10 @@ python3 -m venv .venv && source .venv/bin/activate  # or .venv\Scripts\activate.
 pip install -r requirements.txt
 pip install -r requirements-optional.txt  # optional but covers NLP/GUI/PDF
 python3 -m py_compile requirements_extractor/*.py  # quick syntax check
-python3 -m unittest discover tests                 # should report ~440 passing
+python3 -m unittest discover tests                 # should report ~455 passing
 ```
 
-As of end of 2026-04-24 the baseline is **440 tests passing, 0
+As of end of 2026-04-24 the baseline is **455 tests passing, 0
 failing**. Most tests are headless (no Tk, no spaCy, no LibreOffice,
 no pdfplumber required); a few are gated behind `skipUnless` so they
 run only when their integration dep is present.
@@ -311,7 +311,7 @@ I'm picking up work on the Document Data Extractor project
 `docs/PROJECT_OVERVIEW.md` — read that first.
 
 Baseline facts as of the last session:
-- 440 tests passing, 0 failing.
+- 455 tests passing, 0 failing.
 - Code lives under `requirements_extractor/`. Tests under `tests/`.
   Fixtures under `samples/edge_cases/` (5 files) and
   `samples/procedures/` (11 files).
@@ -347,7 +347,7 @@ Coding conventions I've observed in prior sessions:
 Before making changes:
 - `python3 -m py_compile requirements_extractor/*.py` to confirm
   syntax is clean.
-- `python3 -m unittest discover tests` to confirm the 440-test
+- `python3 -m unittest discover tests` to confirm the 455-test
   baseline.
 
 Now, let's [describe the task].

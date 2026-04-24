@@ -303,7 +303,7 @@ parser:
 
 What each section does:
 
-- **skip_sections** — drop whole rows (by first-column text match) or whole tables (by 1-based index) before parsing.
+- **skip_sections** — drop whole rows (by first-column text match) or whole tables (by 1-based index) before parsing.  By default the matcher also auto-skips a built-in list of common boilerplate sections (Glossary, Acronyms, References, Revision History, Document Control, Table of Contents, Approvals, Distribution, Sign-offs, Applicable Documents, …) — both at section-row level and at top-level Heading 1/2/3 paragraphs (a `Heading: Glossary` drops every requirement until the next non-boilerplate heading at the same level or shallower).  Set `skip_sections.auto_boilerplate: false` to opt out and rely solely on the user-supplied `titles` list.  See `requirements_extractor.config.DEFAULT_BOILERPLATE_TITLES` for the full default.
 - **tables** — where the actor and content columns live, what counts as a requirements table, and the regex that flags a section-header row. The default `section_prefix` handles numeric (`3.1`), dotted (`3.1.2`), and alphanumeric (`SR-1.2`, `A.1`, `REQ-042`) schemes.
 - **keywords** — add house terms (multi-word phrases are fine) or remove built-ins that misfire. `will` is SOFT by default (future-tense prose trips it easily, so matches are yellow-highlighted for review rather than treated as binding). If your house style treats "will" as equivalent to "shall", use `keywords: {hard_add: [will], soft_remove: [will]}`; if you want "will" ignored entirely, use `keywords: {soft_remove: [will]}`.
 - **content** — drop candidate sentences by leading text, by regex, or when no primary actor is available.
@@ -576,7 +576,7 @@ requirements-extractor/                (folder name — Python pkg kept for comp
 ├── samples/                           (sample files for testing)
 │   ├── edge_cases/                    (5 fixtures for parser/config edge cases)
 │   └── procedures/                    (11 fixtures for actor-ID failure modes)
-├── tests/                             (unittest suite, 440 tests)
+├── tests/                             (unittest suite, 455 tests)
 └── requirements_extractor/            (Python package — import path unchanged)
     ├── __init__.py
     ├── models.py                      (dataclasses + event types + dedup helpers)

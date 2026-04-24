@@ -30,17 +30,26 @@ version: 1
 # Sections / tables to ignore entirely.
 # ---------------------------------------------------------------------------
 skip_sections:
-  # Case-insensitive match against the first-column text of each row.
-  # A row is skipped if any of these strings equals it, is contained in it,
-  # or matches it as a prefix (so "3. Revision History" skips when
-  # "Revision History" is in the list).
-  titles:
-    - Revision History
-    - References
-    - Glossary
-    - Table of Contents
-    - Acronyms
-    - Abbreviations
+  # Auto-skip common boilerplate sections (Glossary, Acronyms, References,
+  # Revision History, Document Control, Table of Contents, Approvals,
+  # Distribution List, etc.) without listing each one in `titles`.
+  # The full default list lives in `requirements_extractor.config
+  # .DEFAULT_BOILERPLATE_TITLES`.  Both the section-row title path
+  # (column-1 of a 2-col table) and the heading-scope path (a top-level
+  # Heading 1/2/3 paragraph) honour this — a Heading "Glossary" drops
+  # everything until the next non-boilerplate heading at the same level
+  # or shallower.  Set to false if your corpus genuinely uses one of
+  # the default names for a substantive section.
+  auto_boilerplate: true
+
+  # Case-insensitive match against the first-column text of each row,
+  # OR the text of a top-level Heading paragraph.
+  # A row is skipped if any of these strings equals it, is contained in
+  # it, or matches it as a prefix (so "3. Revision History" skips when
+  # "Revision History" is in the list).  Layered on top of
+  # `auto_boilerplate` — use this for project-specific phrases the
+  # default list doesn't cover.
+  titles: []
 
   # 1-based indices of top-level tables to skip outright.  Handy for the
   # metadata/summary block that some templates put as Table 1.

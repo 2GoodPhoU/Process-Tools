@@ -72,6 +72,13 @@ class _ParseContext:
     # Latest section-style row title encountered; used to populate the
     # Requirement.section_topic column distinctly from primary_actor.
     current_section_title: str = ""
+    # Heading-scope skip state — set when a top-level Heading whose text
+    # matches ``skip_sections.matches_title`` fires (e.g. "Glossary").
+    # Subsequent content is dropped until a Heading at this level or
+    # shallower fires that does NOT match.  ``None`` means "not skipping".
+    # Implementation lives in :func:`parse_docx_events` and
+    # :func:`_emit_candidate`.
+    skip_heading_level: Optional[int] = None
 
     def next_order(self) -> int:
         self.order_counter += 1
@@ -79,6 +86,10 @@ class _ParseContext:
 
     def trail_str(self) -> str:
         return " > ".join(h for h in self.heading_trail if h)
+
+    def in_skipped_section(self) -> bool:
+        """True iff a heading-triggered skip is currently active."""
+        return self.skip_heading_level is not None
 
 
 # ---------------------------------------------------------------------------
@@ -457,6 +468,13 @@ def _emit_candidate(
     richer keyword info), so force mode only kicks in when the classifier
     would otherwise drop the row.
     """
+    # Heading-scope skip: a prior boilerplate heading (e.g. "Glossary",
+    # "References", "Revision History") flipped on a section-wide skip
+    # that stays active until a sibling heading clears it.  Drop anything
+    # captured while it's in effect.  See ``_ParseContext.skip_heading_level``.
+    if ctx.in_skipped_section():
+        return None
+
     # Content-level filter: skip by prefix / pattern.
     if ctx.config.content.should_skip(text):
         return None
@@ -672,6 +690,22 @@ def parse_docx_events(
                 continue
             level = _heading_level(block)
             if level is not None:
+                # Heading-scope skip management.  Two cases:
+                # (a) A skip is currently active and this heading is at
+                #     the skip's level or shallower — the boilerplate
+                #     section has ended.  Clear the flag, then fall
+                #     through and re-evaluate this heading like normal
+                #     (it may itself be another boilerplate heading).
+                # (b) After (a)'s clear, if this heading's text matches
+                #     the skip filter, start a new skip scoped to its
+                #     level so all deeper-or-equal content drops.
+                if (
+                    ctx.skip_heading_level is not None
+                    and level <= ctx.skip_heading_level
+                ):
+                    ctx.skip_heading_level = None
+                if cfg.skip_sections.matches_title(text):
+                    ctx.skip_heading_level = level
                 _update_heading_trail(ctx.heading_trail, level, text)
                 events.append(HeadingEvent(level=level, text=text))
                 continue

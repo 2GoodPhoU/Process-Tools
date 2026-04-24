@@ -103,16 +103,65 @@ DEFAULT_SECTION_PREFIX = (
 )
 
 
+# Common boilerplate section names that almost never carry binding
+# requirements.  Defense / aerospace / telecoms specs all repeat the
+# same shapes; pre-loading these saves users from having to rediscover
+# them per project.  Matched case-insensitively as substring or equality
+# against the section / heading title (same forgiving rule as the
+# user-supplied ``titles`` list — so "3. Revision History" matches
+# "revision history").  Toggle via ``skip_sections.auto_boilerplate``;
+# extend per-project via ``skip_sections.titles`` when a corpus has its
+# own house phrases.
+DEFAULT_BOILERPLATE_TITLES: List[str] = [
+    "glossary",
+    "glossary of terms",
+    "definitions",
+    "acronyms",
+    "abbreviations",
+    "acronyms and abbreviations",
+    "acronyms & abbreviations",
+    "references",
+    "bibliography",
+    "citations",
+    "applicable documents",
+    "reference documents",
+    "revision history",
+    "change history",
+    "version history",
+    "document history",
+    "record of changes",
+    "document control",
+    "document information",
+    "table of contents",
+    "list of figures",
+    "list of tables",
+    "approvals",
+    "sign-off",
+    "sign-offs",
+    "signatures",
+    "distribution",
+    "distribution list",
+]
+
+
 @dataclass
 class SkipSections:
     titles: List[str] = field(default_factory=list)
     # 1-based indices of top-level tables to ignore entirely.
     table_indices: List[int] = field(default_factory=list)
+    # When True (the default), :data:`DEFAULT_BOILERPLATE_TITLES` is
+    # OR-ed into :meth:`matches_title` so common Glossary / References /
+    # Revision History sections are auto-skipped without per-project
+    # configuration.  Set False in a config to disable the defaults
+    # and rely solely on the user-supplied ``titles`` list.
+    auto_boilerplate: bool = True
 
     def matches_title(self, title: str) -> bool:
         if not title:
             return False
         t = title.strip().lower()
+        # User-supplied titles first — these take priority and stay
+        # working unchanged when ``auto_boilerplate`` is False.
         for raw in self.titles:
             if not raw:
                 continue
@@ -122,6 +171,12 @@ class SkipSections:
             # like "3. Revision History" or "Annex A — References".
             if r == t or r in t:
                 return True
+        # Auto-boilerplate match — same forgiving substring/equality
+        # rule, drawn from the built-in defaults list.
+        if self.auto_boilerplate:
+            for r in DEFAULT_BOILERPLATE_TITLES:
+                if r == t or r in t:
+                    return True
         return False
 
 
