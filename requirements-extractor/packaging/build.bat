@@ -7,8 +7,13 @@ REM     python -m venv .venv
 REM     .venv\Scripts\activate.bat
 REM     pip install -r requirements.txt
 REM     pip install -r requirements-optional.txt
-REM     python -m spacy download en_core_web_sm
 REM     pip install -r packaging\build-requirements.txt
+REM     pip install https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1-py3-none-any.whl
+REM
+REM (The pinned model-wheel URL is preferred over `python -m spacy
+REM download` so the build is reproducible and does not depend on
+REM spaCy's download CLI being able to reach the internet.  See the
+REM "Packaging to a Windows .exe" section of README.md.)
 REM
 REM Then from the requirements-extractor folder:
 REM     packaging\build.bat

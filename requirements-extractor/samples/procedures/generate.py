@@ -55,14 +55,25 @@ HERE = Path(__file__).resolve().parent
 
 
 def _write_cell(cell: _Cell, *paragraphs) -> None:
-    """Replace a cell's content with one or more paragraphs of plain text."""
+    """Replace a cell's content with one or more paragraphs.
+
+    Each entry in ``paragraphs`` is either a plain ``str`` (treated as
+    an unstyled body paragraph) or a ``(text, style_name)`` tuple which
+    applies the named Word style — useful for bulleted / numbered list
+    items inside a cell.  Accepts the same shape as
+    ``samples/edge_cases/generate.py`` so readers of either generator
+    don't have to re-learn conventions.
+    """
     first = cell.paragraphs[0]
     first.text = ""
     if not paragraphs:
         return
-    for i, text in enumerate(paragraphs):
+    for i, entry in enumerate(paragraphs):
+        text, style = (entry, None) if isinstance(entry, str) else entry
         target = first if i == 0 else cell.add_paragraph()
         target.text = text
+        if style:
+            target.style = style
 
 
 def _add_heading(doc: Document, text: str, level: int) -> None:
@@ -392,6 +403,373 @@ def build_parallel_flows() -> None:
 
 
 # ---------------------------------------------------------------------------
+# 3-column procedural fixtures (from Eric's 2026-04-23 work-network pass)
+#
+# Shape:
+#     | Actor | Step | Required action |
+#
+# with a header row whose third column literally reads "Required action".
+# Each of the four builders below exercises one of the specific failure
+# modes that surfaced on the work-network documents.  They ship with
+# paired ``.reqx.yaml`` configs that tell the parser which columns are
+# the actor / content (the default 2-column layout wouldn't otherwise
+# map onto these).
+# ---------------------------------------------------------------------------
+
+
+def _add_3col_header(t) -> None:
+    """Populate the header row of a 3-column procedural table.
+
+    The literal "Required action" header is part of what makes these
+    tables special — the column title itself is the signal that every
+    content cell is a requirement, keyword-matched or not.  Kept as a
+    helper so every 3-col fixture uses the same header wording and any
+    future header-aware parser work has one place to grep for.
+    """
+    _write_cell(t.rows[0].cells[0], "Actor")
+    _write_cell(t.rows[0].cells[1], "Step")
+    _write_cell(t.rows[0].cells[2], "Required action")
+
+
+#: Default per-doc config for the 3-col fixtures below.  Writing the
+#: YAML from Python keeps the fixture and its config versioned together
+#: and guarantees neither drifts when the generator is re-run.
+_3COL_REQX_YAML = (
+    "version: 1\n"
+    "tables:\n"
+    "  actor_column: 1\n"
+    "  content_column: 3\n"
+    "  min_columns: 3\n"
+    "  max_columns: 3\n"
+)
+
+
+def _write_3col_config(stem: str) -> None:
+    (HERE / f"{stem}.reqx.yaml").write_text(_3COL_REQX_YAML, encoding="utf-8")
+
+
+# ---------------------------------------------------------------------------
+# Sample 6 — Actor continuation (blank col 1 = inherit from row above)
+# ---------------------------------------------------------------------------
+
+
+def build_procedural_actor_continuation() -> None:
+    """3-column procedural table with blank-actor continuation rows.
+
+    Every row is a requirement; column 1 carries the actor except where
+    a step continues the previous actor's work and is left blank.  The
+    expected behaviour (not yet implemented) is that a blank actor
+    cell inherits the nearest non-blank predecessor's actor, so rows
+    2 and 4 below should both attribute to the Operator even though
+    their own Actor cell is empty.
+
+    Failure mode this targets (FIELD_NOTES §1 + Eric 2026-04-23):
+    the current parser treats the blank cell as "unknown actor" and
+    either drops the row or attributes it to an empty string, which
+    makes the downstream actor summary misleading.
+    """
+    doc = Document()
+    doc.add_heading("Procedure \u2014 Console Shift Handover", level=0)
+    doc.add_paragraph("Document ID: PROC-CONT-006")
+    doc.add_paragraph(
+        "A short procedural table where consecutive steps performed by "
+        "the same actor leave the Actor column blank.  The blank cell "
+        "continues the actor from the row immediately above."
+    )
+
+    _add_heading(doc, "6. Shift Handover Sequence", level=1)
+    t = doc.add_table(rows=6, cols=3)
+    t.style = "Table Grid"
+    _add_3col_header(t)
+
+    _write_cell(t.rows[1].cells[0], "Operator")
+    _write_cell(t.rows[1].cells[1], "1")
+    _write_cell(
+        t.rows[1].cells[2],
+        "The Operator shall log in to the control console and confirm "
+        "the previous shift's handover notes.",
+    )
+
+    # Blank actor cell — continuation from "Operator" above.
+    _write_cell(t.rows[2].cells[0], "")
+    _write_cell(t.rows[2].cells[1], "2")
+    _write_cell(
+        t.rows[2].cells[2],
+        "Verify that all subsystem status indicators read nominal and "
+        "acknowledge any outstanding alarms.",
+    )
+
+    _write_cell(t.rows[3].cells[0], "Supervisor")
+    _write_cell(t.rows[3].cells[1], "3")
+    _write_cell(
+        t.rows[3].cells[2],
+        "The Supervisor must review the overnight alarm log before "
+        "releasing the Operator to normal duties.",
+    )
+
+    # Another continuation — this time continuing the Supervisor.
+    _write_cell(t.rows[4].cells[0], "")
+    _write_cell(t.rows[4].cells[1], "4")
+    _write_cell(
+        t.rows[4].cells[2],
+        "Countersign the handover log once the checks are complete.",
+    )
+
+    _write_cell(t.rows[5].cells[0], "Operator")
+    _write_cell(t.rows[5].cells[1], "5")
+    _write_cell(
+        t.rows[5].cells[2],
+        "The Operator shall acknowledge receipt of the countersigned "
+        "log and begin normal shift duties.",
+    )
+
+    doc.save(HERE / "procedural_actor_continuation.docx")
+    _write_3col_config("procedural_actor_continuation")
+
+
+# ---------------------------------------------------------------------------
+# Sample 7 — Multi-actor column cell, text picks the real actor
+# ---------------------------------------------------------------------------
+
+
+def build_procedural_multi_actor_cell() -> None:
+    """3-column procedural table where column 1 lists multiple candidates.
+
+    Every row names several actors in the Actor column (comma- or
+    slash-separated) to indicate "any of these may perform this step".
+    The requirement text itself then picks which one actually does the
+    work via an explicit subject.  The expected behaviour (not yet
+    implemented) is that the parser treats column 1 as a candidate
+    *set*, then resolves the concrete primary actor from the sentence
+    subject — falling back to the whole set if the text doesn't name
+    one explicitly.
+
+    Failure mode this targets: the current parser either concatenates
+    the whole cell as one synthetic actor name ("Auth Service, Gateway,
+    Logger") or picks the first comma-separated token regardless of
+    what the sentence says.
+    """
+    doc = Document()
+    doc.add_heading("Procedure \u2014 Authentication Handshake", level=0)
+    doc.add_paragraph("Document ID: PROC-MULTI-007")
+    doc.add_paragraph(
+        "A handshake with several services participating per step.  "
+        "The Actor column enumerates the eligible services; the "
+        "Required action column's sentence subject names the one that "
+        "actually carries out the step for a given row."
+    )
+
+    _add_heading(doc, "7. Handshake Sequence", level=1)
+    t = doc.add_table(rows=5, cols=3)
+    t.style = "Table Grid"
+    _add_3col_header(t)
+
+    _write_cell(t.rows[1].cells[0], "Auth Service, Gateway, Logger")
+    _write_cell(t.rows[1].cells[1], "1")
+    _write_cell(
+        t.rows[1].cells[2],
+        "The Gateway shall forward the incoming authentication request "
+        "to the Auth Service without modification.",
+    )
+
+    _write_cell(t.rows[2].cells[0], "Auth Service, Gateway, Logger")
+    _write_cell(t.rows[2].cells[1], "2")
+    _write_cell(
+        t.rows[2].cells[2],
+        "The Auth Service must verify the signed token against the "
+        "published public key before any session state is created.",
+    )
+
+    # Slash-separated variant — same semantic, different punctuation.
+    _write_cell(t.rows[3].cells[0], "Auth Service / Gateway / Logger")
+    _write_cell(t.rows[3].cells[1], "3")
+    _write_cell(
+        t.rows[3].cells[2],
+        "The Logger shall emit a structured audit entry containing the "
+        "request ID, the verifying service, and the outcome.",
+    )
+
+    # Row where the text doesn't explicitly name one of the candidates
+    # — resolver should keep the full candidate set as the primary.
+    _write_cell(t.rows[4].cells[0], "Auth Service, Gateway, Logger")
+    _write_cell(t.rows[4].cells[1], "4")
+    _write_cell(
+        t.rows[4].cells[2],
+        "If the verification fails, the error shall be returned to the "
+        "caller with HTTP status 401 and no session token.",
+    )
+
+    doc.save(HERE / "procedural_multi_actor_cell.docx")
+    _write_3col_config("procedural_multi_actor_cell")
+
+
+# ---------------------------------------------------------------------------
+# Sample 8 — Bullet / numbered list in content cell = multiple requirements
+# ---------------------------------------------------------------------------
+
+
+def build_procedural_bullet_rows() -> None:
+    """3-column procedural table where a content cell holds a bullet list.
+
+    Rows whose content is a bulleted or numbered list should emit one
+    requirement per bullet — losing that boundary collapses several
+    requirements into one synthetic blob and destroys traceability.
+    This fixture mixes plain single-sentence rows with list rows so
+    tests can pin both paths.
+
+    Failure mode this targets: ``parser._cell_text`` historically
+    flattened nested structure within a cell (REVIEW §1.8 — marked
+    LOW, partially addressed).  For bullets specifically the boundary
+    is still frequently lost; Eric's 2026-04-23 pass flagged this
+    explicitly.
+    """
+    doc = Document()
+    doc.add_heading("Procedure \u2014 Pre-Release Checklist", level=0)
+    doc.add_paragraph("Document ID: PROC-BULLETS-008")
+    doc.add_paragraph(
+        "A checklist-style procedure.  Some steps are a single "
+        "sentence; others enumerate several sub-actions as a bullet "
+        "or numbered list within a single cell.  Each bullet is an "
+        "independent requirement."
+    )
+
+    _add_heading(doc, "8. Pre-Release Gate", level=1)
+    t = doc.add_table(rows=5, cols=3)
+    t.style = "Table Grid"
+    _add_3col_header(t)
+
+    _write_cell(t.rows[1].cells[0], "Release Manager")
+    _write_cell(t.rows[1].cells[1], "1")
+    _write_cell(
+        t.rows[1].cells[2],
+        "The Release Manager shall confirm that the build ID in the "
+        "tracker matches the artifact SHA-256 in the pipeline.",
+    )
+
+    # Bulleted list row — 3 distinct requirements.
+    _write_cell(t.rows[2].cells[0], "QA Lead")
+    _write_cell(t.rows[2].cells[1], "2")
+    _write_cell(
+        t.rows[2].cells[2],
+        ("The QA Lead shall execute the following smoke checks:", None),
+        ("Run the authentication smoke-test suite and record pass/"
+         "fail per case.", "List Bullet"),
+        ("Exercise the canary endpoint with a synthetic payload "
+         "under nominal load.", "List Bullet"),
+        ("Confirm that the error budget dashboard is still green "
+         "before clearing the gate.", "List Bullet"),
+    )
+
+    _write_cell(t.rows[3].cells[0], "")
+    _write_cell(t.rows[3].cells[1], "3")
+    _write_cell(
+        t.rows[3].cells[2],
+        "If any smoke check fails, halt the release and notify the "
+        "on-call Release Manager immediately.",
+    )
+
+    # Numbered list row — 3 more distinct requirements, different
+    # style from the bullet list above.
+    _write_cell(t.rows[4].cells[0], "Change Board")
+    _write_cell(t.rows[4].cells[1], "4")
+    _write_cell(
+        t.rows[4].cells[2],
+        ("Before granting the final approval the Change Board must:", None),
+        ("Review the rollback plan and confirm it executes cleanly "
+         "against the staging environment.", "List Number"),
+        ("Verify that the Security Officer has signed off when the "
+         "change touches authentication flows.", "List Number"),
+        ("Record the approval decision and the quorum in the change "
+         "register before the change window opens.", "List Number"),
+    )
+
+    doc.save(HERE / "procedural_bullet_rows.docx")
+    _write_3col_config("procedural_bullet_rows")
+
+
+# ---------------------------------------------------------------------------
+# Sample 9 — Procedural requirements without shall/must keywords
+# ---------------------------------------------------------------------------
+
+
+def build_procedural_no_keywords() -> None:
+    """3-column procedural table whose content has no modal keywords.
+
+    Every row is intended to be a requirement — the ``Required action``
+    column header is the signal — but the sentences use descriptive
+    indicative voice rather than shall/must/should/may.  The current
+    keyword-based detector captures none of these rows; the expected
+    behaviour (not yet implemented) is a "table-is-requirement-table"
+    signal derived from the column header so every non-empty content
+    cell becomes a requirement regardless of modal content.
+
+    Failure mode this targets: procedural tables where the author's
+    house style uses indicative voice ("The Operator confirms…")
+    instead of obligatory voice ("The Operator shall confirm…").
+    Without a header-aware signal these documents silently produce
+    zero requirements — the worst failure mode because the tool
+    appears to have run cleanly.
+    """
+    doc = Document()
+    doc.add_heading("Procedure \u2014 Console Start-of-Shift", level=0)
+    doc.add_paragraph("Document ID: PROC-NOKW-009")
+    doc.add_paragraph(
+        "Written in indicative voice throughout \u2014 no shall / must "
+        "/ should / may.  Each row is a requirement by virtue of the "
+        "Required action column header, not by virtue of any modal "
+        "keyword in the sentence."
+    )
+
+    _add_heading(doc, "9. Start-of-Shift Actions", level=1)
+    t = doc.add_table(rows=6, cols=3)
+    t.style = "Table Grid"
+    _add_3col_header(t)
+
+    _write_cell(t.rows[1].cells[0], "Operator")
+    _write_cell(t.rows[1].cells[1], "1")
+    _write_cell(
+        t.rows[1].cells[2],
+        "The Operator confirms the console lock status at the start "
+        "of every shift.",
+    )
+
+    _write_cell(t.rows[2].cells[0], "Operator")
+    _write_cell(t.rows[2].cells[1], "2")
+    _write_cell(
+        t.rows[2].cells[2],
+        "The Operator reviews the previous shift's handover notes "
+        "before touching any control surface.",
+    )
+
+    _write_cell(t.rows[3].cells[0], "Supervisor")
+    _write_cell(t.rows[3].cells[1], "3")
+    _write_cell(
+        t.rows[3].cells[2],
+        "The Supervisor validates the active alarm list and "
+        "acknowledges any outstanding items.",
+    )
+
+    _write_cell(t.rows[4].cells[0], "Supervisor")
+    _write_cell(t.rows[4].cells[1], "4")
+    _write_cell(
+        t.rows[4].cells[2],
+        "The Supervisor records the go/no-go decision for the shift "
+        "in the shift log.",
+    )
+
+    _write_cell(t.rows[5].cells[0], "Operator")
+    _write_cell(t.rows[5].cells[1], "5")
+    _write_cell(
+        t.rows[5].cells[2],
+        "The Operator acknowledges the go decision and transitions "
+        "the console to normal operating mode.",
+    )
+
+    doc.save(HERE / "procedural_no_keywords.docx")
+    _write_3col_config("procedural_no_keywords")
+
+
+# ---------------------------------------------------------------------------
 # Runner
 # ---------------------------------------------------------------------------
 
@@ -402,9 +780,19 @@ def main() -> None:
     build_implicit_system_actor()
     build_passive_voice()
     build_parallel_flows()
-    print(f"Generated 5 procedure fixtures in {HERE}:")
-    for p in sorted(HERE.glob("*.docx")):
+    build_procedural_actor_continuation()
+    build_procedural_multi_actor_cell()
+    build_procedural_bullet_rows()
+    build_procedural_no_keywords()
+    docs = sorted(HERE.glob("*.docx"))
+    configs = sorted(HERE.glob("*.reqx.yaml"))
+    print(f"Generated {len(docs)} procedure fixtures in {HERE}:")
+    for p in docs:
         print(f"  - {p.name}")
+    if configs:
+        print(f"Paired configs ({len(configs)}):")
+        for p in configs:
+            print(f"  - {p.name}")
 
 
 if __name__ == "__main__":

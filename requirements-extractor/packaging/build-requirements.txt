@@ -2,7 +2,7 @@
 # Install into your build venv:
 #     pip install -r packaging/build-requirements.txt
 #
-# Note on the NLP stack (§2.14):
+# Note on the NLP stack (REVIEW §2.14 / PLAN-nlp-offline.md):
 #
 # The PyInstaller spec at `DocumentDataExtractor.spec` bundles spaCy and
 # its pydantic dependency graph so the "Use NLP" mode works out of the
@@ -16,14 +16,27 @@
 # 2.x).  If you bump `spacy` here, double-check that pydantic and
 # pydantic-core still line up with what spaCy declares in its metadata,
 # or the frozen exe will fail at runtime with a pydantic import error.
+#
+# Model: the English model is installed directly from a pinned wheel
+# URL rather than via `python -m spacy download` so the build is
+# reproducible and does not depend on spaCy's download CLI being able
+# to reach the internet through whatever proxy the build machine has:
+#
+#     pip install https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1-py3-none-any.whl
+#
+# That command belongs in the build recipe (README "Packaging" section),
+# not in this requirements file, because pip won't pin a model wheel
+# purely by URL alongside PEP-440 specifiers.
 
 pyinstaller>=6.0,<7
 
-# --- NLP stack (optional but recommended for bundling) ----------------
-# Uncomment / install alongside if you're producing an NLP-enabled build.
-# (These aren't required for a CLI-only or non-NLP GUI build.)
-#
-# spacy>=3.7,<3.8
-# pydantic>=2.5,<3
-# pydantic-core>=2.14,<3
-# thinc>=8.2,<9
+# --- NLP stack ----------------------------------------------------------
+# Enabled by default so the bundled exe ships with full NLP support
+# (FIELD_NOTES §1 — work-network machines cannot install spaCy
+# post-hoc, so the functionality has to be baked in at build time).
+# Comment the four lines below out if you're producing a CLI-only or
+# non-NLP GUI build and want to trim the exe to ~60 MB.
+spacy>=3.7,<3.8
+pydantic>=2.5,<3
+pydantic-core>=2.14,<3
+thinc>=8.2,<9

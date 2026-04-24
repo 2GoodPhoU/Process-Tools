@@ -19,6 +19,7 @@ from requirements_extractor.gui_state import (
     GuiSettings,
     dedupe_paths,
     default_settings_path,
+    has_secondary_actor_source,
     is_duplicate_of_any,
     write_actors_template,
 )
@@ -37,7 +38,7 @@ class TestGuiSettingsDefaults(unittest.TestCase):
     def test_defaults_are_safe(self) -> None:
         s = GuiSettings()
         self.assertEqual(s.schema_version, 1)
-        self.assertEqual(s.window_geometry, "760x560")
+        self.assertEqual(s.window_geometry, "900x760")
         self.assertEqual(s.last_actors_path, "")
         self.assertEqual(s.last_output_path, "")
         self.assertEqual(s.last_input_dir, "")
@@ -45,6 +46,8 @@ class TestGuiSettingsDefaults(unittest.TestCase):
         self.assertFalse(s.export_statement_set)
         self.assertTrue(s.open_output_on_done)
         self.assertFalse(s.dry_run)
+        self.assertFalse(s.auto_actors)
+        self.assertFalse(s.onboarding_seen)
         self.assertEqual(s.mode, "requirements")
         self.assertEqual(s.recent_inputs, [])
 
@@ -242,6 +245,132 @@ class TestActorsTemplate(unittest.TestCase):
             names = {a.name for a in actors}
             for canonical, _ in ACTORS_TEMPLATE_ROWS:
                 self.assertIn(canonical, names)
+
+
+class TestHasSecondaryActorSource(unittest.TestCase):
+    """PLAN-option-exclusion.md pre-run validation helper.
+
+    The three legitimate sources are an actors .xlsx path, the NLP
+    option, or auto-harvest.  Without any of them the guard should
+    return False so the GUI's _run blocks the run.
+    """
+
+    def test_no_sources_returns_false(self) -> None:
+        self.assertFalse(
+            has_secondary_actor_source(
+                actors_path="", use_nlp=False, auto_actors=False,
+            )
+        )
+
+    def test_whitespace_only_actors_path_is_false(self) -> None:
+        # A field left with stray spaces should not count as "set".
+        self.assertFalse(
+            has_secondary_actor_source(
+                actors_path="   ", use_nlp=False, auto_actors=False,
+            )
+        )
+
+    def test_actors_path_alone_is_enough(self) -> None:
+        self.assertTrue(
+            has_secondary_actor_source(
+                actors_path="/tmp/actors.xlsx",
+                use_nlp=False,
+                auto_actors=False,
+            )
+        )
+
+    def test_nlp_alone_is_enough(self) -> None:
+        self.assertTrue(
+            has_secondary_actor_source(
+                actors_path="", use_nlp=True, auto_actors=False,
+            )
+        )
+
+    def test_auto_actors_alone_is_enough(self) -> None:
+        self.assertTrue(
+            has_secondary_actor_source(
+                actors_path="", use_nlp=False, auto_actors=True,
+            )
+        )
+
+    def test_all_three_is_still_true(self) -> None:
+        # No weird AND-vs-OR confusion if multiple are selected.
+        self.assertTrue(
+            has_secondary_actor_source(
+                actors_path="/tmp/a.xlsx", use_nlp=True, auto_actors=True,
+            )
+        )
+
+
+class TestOnboardingSeen(unittest.TestCase):
+    """FIELD_NOTES §5 / PLAN-onboarding.md.
+
+    The flag must round-trip through the JSON settings file so a user
+    who ticked "Don't show again" doesn't get the modal again on the
+    next launch.
+    """
+
+    def test_defaults_to_false_on_fresh_install(self) -> None:
+        self.assertFalse(GuiSettings().onboarding_seen)
+
+    def test_flag_round_trips_through_disk(self) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "s.json"
+            before = GuiSettings(onboarding_seen=True)
+            before.save(path)
+            after = GuiSettings.load(path)
+            self.assertTrue(after.onboarding_seen)
+
+    def test_missing_flag_in_old_settings_falls_back_to_default(self) -> None:
+        """A settings file written before this field existed must still
+        load cleanly — we don't want a silent wipe of the user's other
+        preferences just because onboarding_seen is absent."""
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "s.json"
+            path.write_text(
+                json.dumps(
+                    {"schema_version": 1, "window_geometry": "800x600"}
+                ),
+                encoding="utf-8",
+            )
+            loaded = GuiSettings.load(path)
+            self.assertFalse(loaded.onboarding_seen)
+            self.assertEqual(loaded.window_geometry, "800x600")
+
+    def test_non_bool_value_on_disk_falls_back(self) -> None:
+        """Hand-edited / corrupt file: a non-bool value must not wedge
+        the GUI — the from_dict guard should fall back to the default."""
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "s.json"
+            path.write_text(
+                json.dumps({"onboarding_seen": "yes please"}),
+                encoding="utf-8",
+            )
+            self.assertFalse(GuiSettings.load(path).onboarding_seen)
+
+
+class TestWindowGeometryBump(unittest.TestCase):
+    """FIELD_NOTES §2 — default grew from 760x560 to 900x760 after
+    field testing clipped the form on Windows HiDPI displays.  The
+    runtime ``_fit_window_to_content`` helper still pins minsize from
+    the packed layout's reqheight, so this default only covers the
+    first frame before the idletasks settle — but it matters on slow
+    machines.
+    """
+
+    def test_default_geometry_is_new_size(self) -> None:
+        self.assertEqual(GuiSettings().window_geometry, "900x760")
+
+    def test_user_saved_geometry_is_preserved(self) -> None:
+        """Bumping the default must not clobber a user who has already
+        resized the window — their saved geometry should load as-is."""
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "s.json"
+            GuiSettings(window_geometry="1200x950+100+50").save(path)
+            self.assertEqual(
+                GuiSettings.load(path).window_geometry,
+                "1200x950+100+50",
+            )
 
 
 if __name__ == "__main__":

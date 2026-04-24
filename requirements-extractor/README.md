@@ -435,11 +435,13 @@ python -m venv .venv
 .venv\Scripts\activate.bat
 pip install -r requirements.txt
 pip install -r requirements-optional.txt
-python -m spacy download en_core_web_sm
 pip install -r packaging\build-requirements.txt
+pip install https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1-py3-none-any.whl
 ```
 
-That installs everything the tool needs plus PyInstaller.
+That installs everything the tool needs plus PyInstaller and the English spaCy model.
+
+> **Why the explicit model wheel?** `python -m spacy download en_core_web_sm` works fine on a connected developer machine, but it funnels through spaCy's download CLI and depends on that CLI being able to reach `github.com` through whatever proxy the build machine has. Installing the wheel directly (the URL above) skips that layer and pins the exact model version, so builds on two different machines produce byte-identical NLP data. If a future spaCy version requires a newer model, bump the `3.7.1` in the URL to match.
 
 ### Build
 
@@ -462,13 +464,25 @@ Just re-run `packaging\build.bat`. It cleans the previous `build/` and `dist/` f
 ### Troubleshooting the build
 
 - **"ModuleNotFoundError" at runtime for some spaCy submodule** — add the missing module name to the `_bundle("...")` list at the top of `packaging/DocumentDataExtractor.spec` and rebuild.
-- **"en_core_web_sm not found" at runtime** — you forgot `python -m spacy download en_core_web_sm` in the build venv. The spec collects the model at build time; if it's not installed, the bundled exe won't have it.
+- **"en_core_web_sm not found" at runtime** — you forgot the `pip install https://.../en_core_web_sm-3.7.1-py3-none-any.whl` step in the build venv (see the "One-time setup" block above). The spec collects the model at build time; if it's not installed, the bundled exe won't have it.
 - **Exe is huge** — that's spaCy + its model. If you don't need the NLP feature, remove every entry in the `for _pkg in (...)` block of the spec except the first block; the exe will drop to around 60 MB.
 - **Exe launches then closes immediately** — rebuild with `console=True` in the spec so you can see the error traceback, fix it, then switch back to `console=False`.
 
 ### macOS / Linux builds
 
 `packaging/build.sh` does the equivalent build on macOS or Linux (produces a `.app` bundle on Mac or a single binary on Linux). Same limitations apply — you must build on the OS you want to target.
+
+### Bundling for a restricted network (no spaCy install on the target)
+
+If the machine where the tool actually runs can't install spaCy — common on corporate or air-gapped networks — the bundled exe is the supported path. The build machine needs internet once (to fetch spaCy + the model wheel into its build venv), after which the produced exe is fully self-contained and has no install-time network dependency on the target.
+
+The flow is the same as the "One-time setup" above; the things worth calling out specifically:
+
+1. **Pin the model wheel URL, don't use `spacy download`.** The URL in the setup block above pins `en_core_web_sm-3.7.1` so two build machines produce identical bundles. If the target-network software-approval process asks for a SHA-256 attestation, hash the produced exe after the build and record it alongside the release.
+2. **Verify `ActorResolver.has_nlp()` returns True in the bundled exe before shipping.** A silent NLP downgrade is the worst failure mode because the tool appears to work. Smoke test: run the bundled exe against one sample doc with "Use NLP" ticked and grep the log for `NLP unavailable`; if it's absent, NLP loaded cleanly.
+3. **Distribute the exe via whatever channel the target network accepts.** The bundle has no install-time network calls, so a shared drive or signed installer both work.
+4. **AV / SmartScreen.** The spec already disables UPX (`upx=False`) because that's the #1 trigger for AV quarantine on PyInstaller single-file exes. If the target network's AV still flags the artifact, fall back to `--onedir` layout (edit the spec) or buy a code-signing certificate.
+5. **Rebuild cadence.** Regenerate the bundle whenever `requirements-optional.txt`, `packaging/DocumentDataExtractor.spec`, or any file under `requirements_extractor/` changes. Without CI this is a manual gate, so add it to the release checklist.
 
 ## Tuning
 

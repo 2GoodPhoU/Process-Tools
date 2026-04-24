@@ -29,6 +29,7 @@ from typing import Optional
 from tkinter import (
     BooleanVar,
     END,
+    Menu,
     StringVar,
     Tk,
     filedialog,
@@ -39,9 +40,11 @@ from tkinter.scrolledtext import ScrolledText
 
 from .actor_scan import ActorScanCancelled, scan_actors_from_files
 from .extractor import ExtractionCancelled, extract_from_files
+from .gui_help import GettingStartedDialog, Tooltip
 from .gui_state import (
     GuiSettings,
     dedupe_paths,
+    has_secondary_actor_source,
     is_duplicate_of_any,
     write_actors_template,
 )
@@ -121,7 +124,16 @@ class ExtractorApp:
         self._last_output_path: Optional[Path] = None
 
         self._build_ui()
+        self._build_menu()
+        self._fit_window_to_content()
         root.protocol("WM_DELETE_WINDOW", self._on_close)
+
+        # FIELD_NOTES §5 / PLAN-onboarding.md: first-run modal.  Deferred
+        # via ``after`` so the modal lands on top of a fully-rendered
+        # root rather than racing the initial paint.  Help → Getting
+        # started… re-opens it on demand regardless of the saved flag.
+        if not self.settings.onboarding_seen:
+            self.root.after(200, self._show_getting_started_auto)
 
     # ----------------------------------------------------------------- #
     # UI construction
@@ -142,8 +154,114 @@ class ExtractorApp:
         self._build_statement_set_section(frm, pad)
         self._build_run_section(frm, pad)
         # Apply initial mode-dependent state (enables/disables ss section
-        # and adjusts output default for the current mode).
+        # and adjusts output default for the current mode).  Also runs
+        # ``_update_option_state`` so the dry-run / auto-actors / ss
+        # widgets match the mode before the user touches anything
+        # (FIELD_NOTES §3 / PLAN-option-exclusion).
         self._on_mode_change()
+
+    def _build_menu(self) -> None:
+        """Attach a minimal Help menu to the root window.
+
+        FIELD_NOTES §5 / PLAN-onboarding.md.  The menubar shows as a
+        top-of-window bar on Windows / Linux and as an application-menu
+        extension on macOS — Tk handles that platform split itself.
+        """
+        menubar = Menu(self.root)
+        help_menu = Menu(menubar, tearoff=False)
+        help_menu.add_command(
+            label="Getting started\u2026",
+            command=self._show_getting_started,
+        )
+        help_menu.add_command(
+            label="Open README",
+            command=self._open_readme,
+        )
+        help_menu.add_separator()
+        help_menu.add_command(label="About", command=self._show_about)
+        menubar.add_cascade(label="Help", menu=help_menu)
+        try:
+            self.root.config(menu=menubar)
+        except Exception:  # pragma: no cover — some test stubs lack menu=
+            pass
+
+    def _show_getting_started(self) -> None:
+        """Open the first-run modal on demand (Help menu).
+
+        Called from the Help menu, so we pass ``settings=None`` — we
+        never want a manual reopen to silently record a "don't show"
+        decision.
+        """
+        GettingStartedDialog(self.root)
+
+    def _show_getting_started_auto(self) -> None:
+        """Auto-open the first-run modal at startup.
+
+        Differs from :meth:`_show_getting_started` only in that the
+        dialog is handed the settings object, so ticking "Don't show
+        again" persists on close.
+        """
+        GettingStartedDialog(self.root, settings=self.settings)
+
+    def _open_readme(self) -> None:
+        """Open the bundled README.md, falling back to the source-tree copy.
+
+        When frozen by PyInstaller, bundled data files live under
+        ``sys._MEIPASS``.  Otherwise we're running from source and the
+        README is two directories up from this module.
+        """
+        candidates: list[Path] = []
+        meipass = getattr(sys, "_MEIPASS", None)
+        if meipass:
+            candidates.append(Path(meipass) / "README.md")
+        candidates.append(Path(__file__).resolve().parents[1] / "README.md")
+        for p in candidates:
+            if p.exists():
+                _platform_open(p)
+                return
+        messagebox.showinfo(
+            "README not found",
+            "Could not locate README.md.  See the project repository "
+            "for full documentation.",
+        )
+
+    def _show_about(self) -> None:
+        messagebox.showinfo(
+            "About Document Data Extractor",
+            "Document Data Extractor\n\n"
+            "Pulls structured requirements data out of Word (.docx) "
+            "specifications.\n\n"
+            "See Help \u2192 Getting started\u2026 for a short walkthrough.",
+        )
+
+    def _fit_window_to_content(self) -> None:
+        """Ensure the initial window is at least as big as the packed layout.
+
+        FIELD_NOTES §2 — on Windows HiDPI laptops the saved geometry can
+        be smaller than what the widgets need at the current DPI, so the
+        lower half of the form ends up clipped on first launch.  Tk only
+        computes widget requested sizes after an idle pass, so the
+        ``root.geometry(...)`` call in ``__init__`` can't know how tall
+        the form actually wants to be.  Running ``update_idletasks()``
+        forces geometry to settle, then we grow (never shrink) the saved
+        size to cover the layout and pin ``minsize`` so the user can't
+        accidentally clip the form by dragging the handle.
+        """
+        self.root.update_idletasks()
+        req_w = self.root.winfo_reqwidth()
+        req_h = self.root.winfo_reqheight()
+        # Parse "WxH+X+Y" or "WxH"; fall back silently if the string is odd.
+        saved_w, saved_h = req_w, req_h
+        try:
+            size_part = self.settings.window_geometry.split("+", 1)[0]
+            sw, sh = size_part.split("x", 1)
+            saved_w, saved_h = int(sw), int(sh)
+        except (ValueError, AttributeError):
+            pass
+        final_w = max(saved_w, req_w)
+        final_h = max(saved_h, req_h)
+        self.root.geometry(f"{final_w}x{final_h}")
+        self.root.minsize(req_w, req_h)
 
     # --- section: mode --- #
 
@@ -264,24 +382,27 @@ class ExtractorApp:
     def _build_options_section(self, parent: ttk.Frame, pad: dict) -> None:
         frame = ttk.LabelFrame(parent, text="4. Options")
         frame.pack(fill="x", **pad)
-        ttk.Checkbutton(
+        self.use_nlp_cb = ttk.Checkbutton(
             frame,
             text="Use NLP to detect secondary actors (requires spaCy)",
             variable=self.use_nlp,
-        ).pack(anchor="w", padx=4, pady=2)
+            command=self._update_option_state,
+        )
+        self.use_nlp_cb.pack(anchor="w", padx=4, pady=2)
         ttk.Checkbutton(
             frame,
             text="Open output file when the run finishes",
             variable=self.open_output_on_done,
         ).pack(anchor="w", padx=4, pady=2)
-        ttk.Checkbutton(
+        self.dry_run_cb = ttk.Checkbutton(
             frame,
             text=(
                 "Dry run \u2014 parse & count but don't write any files "
                 "(requirements mode only)"
             ),
             variable=self.dry_run,
-        ).pack(anchor="w", padx=4, pady=2)
+        )
+        self.dry_run_cb.pack(anchor="w", padx=4, pady=2)
         self.auto_actors_cb = ttk.Checkbutton(
             frame,
             text=(
@@ -290,8 +411,37 @@ class ExtractorApp:
                 "(overrides the Actors list above; requirements mode only)"
             ),
             variable=self.auto_actors,
+            command=self._update_option_state,
         )
         self.auto_actors_cb.pack(anchor="w", padx=4, pady=2)
+
+        # FIELD_NOTES §5 / PLAN-onboarding.md: tooltips on the options
+        # whose semantics aren't obvious from the label alone.  Held on
+        # the instance so they're not GC'd out from under their
+        # <Enter>/<Leave> bindings.
+        self._tooltips = [
+            Tooltip(
+                self.use_nlp_cb,
+                "Uses spaCy NER to find secondary actors in the prose. "
+                "Higher recall than the regex/actors-xlsx path on "
+                "unseen names, but requires spaCy and an English model "
+                "to be installed.  If spaCy is missing the run still "
+                "completes \u2014 you just get fewer actors.",
+            ),
+            Tooltip(
+                self.dry_run_cb,
+                "Parses, detects, and assigns stable IDs but does not "
+                "write any files.  Useful for previewing totals before "
+                "overwriting an existing output.",
+            ),
+            Tooltip(
+                self.auto_actors_cb,
+                "Runs the actor scan on the inputs before the "
+                "requirements pass and uses its output as the Actors "
+                "list.  Saves you maintaining a separate actors.xlsx. "
+                "Requirements mode only.",
+            ),
+        ]
 
     # --- section: output --- #
 
@@ -331,6 +481,19 @@ class ExtractorApp:
             state=initial_state,
         )
         self.ss_browse_btn.pack(side="left", padx=4)
+        # Extend the tooltip list built in _build_options_section.  The
+        # attribute is guaranteed to exist because _build_options_section
+        # runs before this one in _build_ui().
+        if hasattr(self, "_tooltips"):
+            self._tooltips.append(
+                Tooltip(
+                    self.ss_checkbox,
+                    "Also emits a paired-level statement-set CSV "
+                    "alongside the Excel output \u2014 a flatter, "
+                    "review-friendly format that preserves heading "
+                    "hierarchy.  Requirements mode only.",
+                )
+            )
 
     # --- section: run + log --- #
 
@@ -542,20 +705,57 @@ class ExtractorApp:
         * Swaps the default output file name when the current output
           still matches the other mode's default (no stomp on
           user-customised paths).
+        * Delegates every widget enable/disable decision through
+          :meth:`_update_option_state` so we have a single source of
+          truth for mode-dependent UI state.
         """
         mode = self.mode.get()
-        # Statement-set section: only meaningful in requirements mode.
-        self._toggle_statement_set()
-        if hasattr(self, "ss_checkbox"):
-            self.ss_checkbox.config(
-                state="normal" if mode == "requirements" else "disabled"
-            )
+        self._update_option_state()
         # Swap default output name if the user hasn't picked a custom path.
         current = self.output_file.get().strip()
         current_name = Path(current).name if current else ""
         if current_name in _DEFAULT_OUTPUT_NAMES:
             parent = Path(current).parent if current else Path.cwd()
             self.output_file.set(str(parent / _default_output_name(mode)))
+
+    def _update_option_state(self) -> None:
+        """Enable/disable mode-dependent controls.
+
+        PLAN-option-exclusion.md: centralise enable/disable logic so no
+        callback forgets a widget.  Called whenever mode, NLP,
+        auto-actors, or the actors path changes.  Idempotent — firing
+        it more than once is harmless.
+
+        Hard-disable variant (per user decision): req-only controls
+        are greyed out in actors mode rather than merely warned about,
+        and any stale req-only booleans are forced off so flipping
+        back into requirements mode is never a surprise.
+        """
+        mode = self.mode.get()
+        is_requirements = mode == "requirements"
+
+        # Requirements-only options — off means both disabled AND
+        # visually de-emphasised so the user doesn't wonder why
+        # clicking does nothing in actors mode.
+        req_only_state = "normal" if is_requirements else "disabled"
+        for widget in (
+            getattr(self, "auto_actors_cb", None),
+            getattr(self, "dry_run_cb", None),
+            getattr(self, "ss_checkbox", None),
+        ):
+            if widget is not None:
+                widget.config(state=req_only_state)
+
+        # Statement-set path row follows the checkbox *and* the mode.
+        # ``_toggle_statement_set`` reads both flags.
+        self._toggle_statement_set()
+
+        # If we just left requirements mode, force the req-only booleans
+        # off so a subsequent toggle back doesn't silently re-enable a
+        # dry-run or an auto-actors harvest that the user forgot about.
+        if not is_requirements:
+            self.auto_actors.set(False)
+            self.dry_run.set(False)
 
     def _log(self, msg: str) -> None:
         self.log.insert(END, msg + "\n")
@@ -579,6 +779,31 @@ class ExtractorApp:
         out_path = self.output_file.get().strip()
         if not out_path:
             messagebox.showwarning("No output", "Please choose an output .xlsx path.")
+            return
+
+        # PLAN-option-exclusion.md: requirements mode needs at least one
+        # secondary-actor source, or the run silently captures only the
+        # first-column (primary) actor and wastes reviewer time.  Hard-
+        # block rather than warn — the hard-disable variant locked in
+        # with the user.  The three legitimate sources are an explicit
+        # actors xlsx, the NLP option, or auto-harvest.
+        if not self._has_secondary_actor_source():
+            messagebox.showwarning(
+                "No actor source selected",
+                (
+                    "Requirements mode needs at least one way to find "
+                    "secondary actors, or it will only capture the "
+                    "first-column (primary) actor for each row. Pick "
+                    "one:\n\n"
+                    " \u2022 Point \"Actors list\" at a curated .xlsx "
+                    "(Save template\u2026 generates a starter).\n"
+                    " \u2022 Enable \"Use NLP to detect secondary "
+                    "actors\" (requires spaCy + English model).\n"
+                    " \u2022 Enable \"Auto-harvest actors first\" to "
+                    "let the tool build a list from the inputs before "
+                    "the run."
+                ),
+            )
             return
 
         actors_path = self.actors_file.get().strip()
@@ -695,6 +920,18 @@ class ExtractorApp:
 
         self._worker = threading.Thread(target=worker, daemon=True)
         self._worker.start()
+
+    def _has_secondary_actor_source(self) -> bool:
+        """Thin wrapper over :func:`gui_state.has_secondary_actor_source`.
+
+        Reads the current widget state and delegates to the pure helper
+        so the guard can be covered by headless tests without a Tk root.
+        """
+        return has_secondary_actor_source(
+            actors_path=self.actors_file.get(),
+            use_nlp=bool(self.use_nlp.get()),
+            auto_actors=bool(self.auto_actors.get()),
+        )
 
     def _on_file_progress(self, i: int, n: int, name: str) -> None:
         self.progress.config(value=i, maximum=max(1, n))

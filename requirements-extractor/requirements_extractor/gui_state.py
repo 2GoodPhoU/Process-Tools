@@ -54,9 +54,16 @@ class GuiSettings:
 
     schema_version: int = 1
 
-    # Window geometry — stored as a string like "760x560+120+80" that
+    # Window geometry — stored as a string like "900x760+120+80" that
     # Tk's ``root.geometry()`` consumes directly.
-    window_geometry: str = "760x560"
+    #
+    # FIELD_NOTES §2: grown from "760x560" after field testing on a work
+    # laptop — the old default clipped the bottom half of the form on
+    # Windows HiDPI displays.  Runtime ``_fit_window_to_content`` in
+    # ``gui.py`` still pins ``minsize`` from the packed layout's
+    # ``reqheight``, so this default is only load-bearing for the first
+    # frame before ``update_idletasks`` settles widget sizes.
+    window_geometry: str = "900x760"
 
     # Last-used paths (empty string = no preference).
     last_actors_path: str = ""
@@ -78,6 +85,12 @@ class GuiSettings:
     # inputs and uses its output as the actors list — saves the "maintain
     # a separate actors.xlsx" step for users who just want to go.
     auto_actors: bool = False
+
+    # Onboarding: True once the user has dismissed the first-run modal
+    # via its "Don't show this again" checkbox.  Help → Getting started…
+    # reopens it on demand regardless of this flag.  Cleared by deleting
+    # settings.json.  (FIELD_NOTES §5 / PLAN-onboarding.md)
+    onboarding_seen: bool = False
 
     # Extraction mode the user last chose in the GUI.  Mirrors the CLI
     # subcommand names so the two surfaces stay in lockstep.  Unknown
@@ -235,6 +248,26 @@ def is_duplicate_of_any(candidate: Path, existing: Iterable[Path]) -> bool:
     """True if ``candidate`` resolves to the same file as any in ``existing``."""
     key = _safe_resolve(Path(candidate))
     return any(_safe_resolve(Path(p)) == key for p in existing)
+
+
+def has_secondary_actor_source(
+    actors_path: str, use_nlp: bool, auto_actors: bool
+) -> bool:
+    """Return True iff at least one secondary-actor source is selected.
+
+    The three legitimate sources are:
+
+    * an explicit actors .xlsx (``actors_path`` non-empty),
+    * the NLP option (``use_nlp=True``),
+    * auto-harvest (``auto_actors=True``).
+
+    With none of these, a requirements run can only capture the first
+    column (primary) actor and the output is misleading — the GUI
+    blocks Run in that case per PLAN-option-exclusion.md.  Lives here
+    rather than in ``gui.py`` so the guard can be unit-tested without
+    standing up a Tk root.
+    """
+    return bool((actors_path or "").strip()) or bool(use_nlp) or bool(auto_actors)
 
 
 # ---------------------------------------------------------------------------

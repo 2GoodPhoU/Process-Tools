@@ -1,0 +1,6 @@
+version: 1
+tables:
+  actor_column: 1
+  content_column: 3
+  min_columns: 3
+  max_columns: 3
