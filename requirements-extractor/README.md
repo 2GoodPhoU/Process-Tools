@@ -403,6 +403,7 @@ Two sheets:
 | Keywords         | Which trigger words matched.                                                                |
 | Confidence       | High / Medium / Low — a rough heuristic, not a guarantee.                                   |
 | Notes            | Flags for the reviewer (e.g. "verify soft language").                                       |
+| Context          | Short snippet of the surrounding source text (the requirement's enclosing paragraph / bullet / cell). Empty when the requirement IS the entire source paragraph (no value-add). Whitespace-collapsed, capped at 280 chars with a sentence-friendly `…` truncation. Reviewer can sanity-check intent without opening the .docx. |
 
 **Summary** — quick totals and a breakdown by primary actor.
 
@@ -575,7 +576,7 @@ requirements-extractor/                (folder name — Python pkg kept for comp
 ├── samples/                           (sample files for testing)
 │   ├── edge_cases/                    (5 fixtures for parser/config edge cases)
 │   └── procedures/                    (11 fixtures for actor-ID failure modes)
-├── tests/                             (unittest suite, 427 tests)
+├── tests/                             (unittest suite, 440 tests)
 └── requirements_extractor/            (Python package — import path unchanged)
     ├── __init__.py
     ├── models.py                      (dataclasses + event types + dedup helpers)

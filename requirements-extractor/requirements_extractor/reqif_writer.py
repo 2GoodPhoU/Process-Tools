@@ -104,6 +104,9 @@ _BASE_ATTRIBUTES: List[tuple] = [
     ("keywords",        "Keywords",         lambda r: r.keywords_str),
     ("confidence",      "Confidence",       lambda r: r.confidence),
     ("notes",           "Notes",            lambda r: r.notes),
+    # REVIEW §3.8 — surrounding source text for reviewer cross-check.
+    # Empty when the requirement spans the entire source paragraph.
+    ("context",         "Context",          lambda r: r.context),
 ]
 
 

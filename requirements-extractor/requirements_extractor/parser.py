@@ -388,6 +388,50 @@ def _resolve_primary_from_candidates(
 _length_based_confidence = compute_confidence
 
 
+#: REVIEW §3.8 — soft cap on the inline context column.  Long enough to
+#: carry one or two surrounding sentences; short enough that it doesn't
+#: distort the reviewer's xlsx column widths.  Truncation is sentence-
+#: friendly: we cut at the last whitespace before the cap and append "…".
+_MAX_CONTEXT_CHARS = 280
+
+
+def _build_context(context: str, text: str) -> str:
+    """Return a reviewer-friendly context snippet, or "" if not useful.
+
+    Two suppression cases keep the column from carrying noise:
+
+    1. **Empty input** — nothing to show.
+    2. **Context is the requirement** — when a paragraph or bullet has
+       only one sentence, the captured block text equals the
+       requirement text after normalisation.  Showing it twice in the
+       row would just waste horizontal space, so we collapse to "".
+
+    Otherwise we whitespace-collapse and (if needed) truncate to
+    :data:`_MAX_CONTEXT_CHARS`, cutting at the last whitespace inside
+    the cap so we don't bisect a word.  The truncated suffix is "…"
+    (a single character so the visible width stays predictable).
+    """
+    if not context:
+        return ""
+    # Whitespace-collapse so multi-line bullets become single-line context.
+    collapsed = " ".join(context.split())
+    if not collapsed:
+        return ""
+    # Same normalisation as compute_stable_id — keeps the redundancy
+    # check insensitive to cosmetic differences (a stray space, a
+    # trailing newline, an ALL-CAPS run vs the title-case original).
+    text_norm = " ".join((text or "").split()).casefold()
+    if collapsed.casefold() == text_norm:
+        return ""
+    if len(collapsed) <= _MAX_CONTEXT_CHARS:
+        return collapsed
+    cap = _MAX_CONTEXT_CHARS - 1  # leave room for the ellipsis
+    cut = collapsed.rfind(" ", 0, cap)
+    if cut <= 0:
+        cut = cap
+    return collapsed[:cut].rstrip() + "…"
+
+
 def _emit_candidate(
     text: str,
     ctx: _ParseContext,
@@ -396,6 +440,7 @@ def _emit_candidate(
     block_ref: str,
     primary_actor: str,
     force_requirement: bool = False,
+    context: str = "",
 ) -> Optional[Requirement]:
     """Build a Requirement iff ``text`` passes detection + config filters.
 
@@ -452,6 +497,7 @@ def _emit_candidate(
         notes=notes,
         polarity=polarity,
         stable_id=compute_stable_id(ctx.source_file, primary_actor, text),
+        context=_build_context(context, text),
     )
 
 
@@ -514,10 +560,14 @@ def _walk_content(
                 actor_for_this = _pick_primary(
                     text, primary_actor, candidate_actors
                 )
+                # Bullet text IS the unit; context normally collapses
+                # to "" because text == context.  We still pass it so
+                # multi-sentence bullets show the sibling sentences.
                 req = _emit_candidate(
                     text, ctx,
                     row_ref=row_ref, block_ref=br, primary_actor=actor_for_this,
                     force_requirement=force_requirement,
+                    context=text,
                 )
                 if req is not None:
                     req.secondary_actors = resolver_fn(text, actor_for_this)
@@ -525,6 +575,9 @@ def _walk_content(
             else:
                 paragraph_idx += 1
                 br = _push_ref(f"Paragraph {paragraph_idx}")
+                # The full paragraph is the natural reviewer context for
+                # every sentence we extract from it.  ``_build_context``
+                # suppresses redundancy when paragraph == sentence.
                 for sent in split_sentences(text):
                     actor_for_this = _pick_primary(
                         sent, primary_actor, candidate_actors
@@ -533,6 +586,7 @@ def _walk_content(
                         sent, ctx,
                         row_ref=row_ref, block_ref=br, primary_actor=actor_for_this,
                         force_requirement=force_requirement,
+                        context=text,
                     )
                     if req is not None:
                         req.secondary_actors = resolver_fn(sent, actor_for_this)
@@ -573,6 +627,7 @@ def _walk_content(
                                 row_ref=row_ref, block_ref=br,
                                 primary_actor=primary_actor,
                                 force_requirement=force_requirement,
+                                context=cell_text,
                             )
                             if req is not None:
                                 req.secondary_actors = resolver_fn(sent, primary_actor)
@@ -629,6 +684,7 @@ def parse_docx_events(
                     row_ref="Preamble",
                     block_ref="Paragraph",
                     primary_actor="",
+                    context=text,
                 )
                 if req is not None:
                     req.secondary_actors = resolver_fn(sent, "")

@@ -144,6 +144,7 @@ class Requirement:
     notes: str = ""                     # free-text flags for reviewers
     polarity: str = "Positive"          # "Positive" | "Negative" (shall-not etc.)
     stable_id: str = ""                 # "REQ-<8hex>" - survives upstream content churn
+    context: str = ""                   # surrounding source text for reviewer context (REVIEW §3.8); empty when redundant with `text`
 
     @property
     def secondary_actors_str(self) -> str:

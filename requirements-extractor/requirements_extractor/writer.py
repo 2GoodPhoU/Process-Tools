@@ -27,6 +27,10 @@ COLUMNS = [
     ("Keywords", 20),
     ("Confidence", 12),
     ("Notes", 36),
+    # REVIEW §3.8 — surrounding source text so a reviewer can sanity-
+    # check the requirement without opening the .docx.  Empty when the
+    # requirement IS the entire source paragraph (no value-add).
+    ("Context", 60),
 ]
 
 HEADER_FILL = PatternFill("solid", start_color="1F3864")
@@ -77,6 +81,7 @@ def write_requirements(
             req.keywords_str,
             req.confidence,
             req.notes,
+            req.context,
         ]
         # Pick a row fill: Negative polarity beats Soft, since flagging
         # "shall not / must not" language for a reviewer matters more than
