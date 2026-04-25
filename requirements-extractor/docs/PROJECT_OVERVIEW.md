@@ -144,6 +144,7 @@ whole thing.
 | Actor resolution (regex + NLP + NER canonicalisation) | `actors.py` | `test_encapsulation.py`, `test_ner_canonicalisation.py` |
 | Stable IDs + cross-source dedup | `models.py` | `test_stable_ids.py` |
 | Config (per-run and per-doc YAML) | `config.py` | `test_config.py` |
+| Standalone keywords-file loader | `keywords_loader.py` | `test_batch_improvements.py` (`load_keywords_raw` blocks) |
 | Primary output (`.xlsx`) | `writer.py` | covered via `test_stable_ids.py`, end-to-end tests |
 | Extra outputs (JSON, Markdown) | `writers_extra.py` + shims in `json_writer.py` / `md_writer.py` | `test_writers_extra.py` |
 | ReqIF output (with dialects) | `reqif_writer.py` | `test_reqif_writer.py` |

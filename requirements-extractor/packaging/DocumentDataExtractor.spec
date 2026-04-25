@@ -107,6 +107,7 @@ a = Analysis(
         "requirements_extractor.gui_help",
         "requirements_extractor.gui_state",
         "requirements_extractor.json_writer",
+        "requirements_extractor.keywords_loader",
         "requirements_extractor.legacy_formats",
         "requirements_extractor.md_writer",
         "requirements_extractor.models",
