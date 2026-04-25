@@ -6,6 +6,8 @@ Secondary actors come from (in order of preference):
      optional "Aliases" column containing comma-separated alternates).
   2. An optional spaCy-based NER pass (only if the user asked for it and
      spaCy is installed with an English model).
+  3. An optional rule-based heuristics pass (the offline-network fallback;
+     see :mod:`requirements_extractor.actor_heuristics`).
 """
 
 from __future__ import annotations
@@ -27,7 +29,7 @@ class ActorEntry:
 
 
 # ---------------------------------------------------------------------------
-# NER canonicalisation (REVIEW §1.7)
+# NER canonicalisation (REVIEW section 1.7)
 #
 # spaCy NER returns entity text verbatim, which in specs produces noisy
 # surfaces like "the Auth Service" (leading determiner), "the Gateway's"
@@ -38,13 +40,13 @@ class ActorEntry:
 
 
 #: Leading determiners to strip (lower-cased).  Order matters only for
-#: documentation — the matching is a straight startswith on each entry.
+#: documentation -- the matching is a straight startswith on each entry.
 _LEADING_DETERMINERS: Tuple[str, ...] = ("the ", "a ", "an ")
 
 
 #: Trailing possessive suffixes (ASCII apostrophe and curly apostrophe)
 #: that should be removed so "Gateway's" becomes "Gateway".
-_TRAILING_POSSESSIVES: Tuple[str, ...] = ("'s", "\u2019s")
+_TRAILING_POSSESSIVES: Tuple[str, ...] = ("'s", "’s")
 
 
 _WORD_TOKEN_RE = re.compile(r"\w+")
@@ -58,9 +60,9 @@ def canonicalise_ner_name(
     """Clean up a raw NER entity string into an actor-shaped name.
 
     Strips leading determiners (``the``/``a``/``an``) and trailing
-    possessives (``'s`` / curly-apostrophe ``\u2019s``).  Returns
+    possessives (``'s`` / curly-apostrophe ``’s``).  Returns
     ``None`` when the result would be empty or contains no letters/
-    digits — drop those rather than surface garbage to the reviewer.
+    digits -- drop those rather than surface garbage to the reviewer.
 
     ``canonical_names`` is an optional whitelist.  When provided, a
     cleaned entity must share at least one token (case-insensitive,
@@ -69,7 +71,7 @@ def canonicalise_ner_name(
     ``USA`` / ``Corp``: if those aren't in the user's curated actors
     list, they get dropped even though spaCy labelled them ORG.
     Without ``canonical_names`` (i.e. no user-supplied actors file),
-    every cleaned entity passes through — the caller is trusting the
+    every cleaned entity passes through -- the caller is trusting the
     entity-label whitelist alone in that mode.
     """
     if not raw:
@@ -96,7 +98,7 @@ def canonicalise_ner_name(
     # Drop anything that's now empty or has no alphanumeric content.
     if not s or not any(c.isalnum() for c in s):
         return None
-    # A bare determiner on its own (no following word) is garbage — the
+    # A bare determiner on its own (no following word) is garbage -- the
     # loop above only strips "the " (with trailing space), so "the"
     # alone slips through.  Catch it here.
     if s.lower() in {"the", "a", "an"}:
@@ -119,17 +121,17 @@ def canonicalise_ner_name(
 class ActorResolver:
     """Looks up secondary actors in a requirement's text.
 
-    The resolver is deliberately tolerant — it does case-insensitive
+    The resolver is deliberately tolerant -- it does case-insensitive
     word-boundary matching against every known name/alias and returns a
     deduped list of canonical names.
     """
 
     # Labels we treat as actor-ish when scanning NLP entities.
     #
-    # REVIEW §1.7: NORP (nationalities / religious / political groups)
-    # and PRODUCT were both listed originally but produce noise on
-    # specs — "ISO"-as-NORP, "Windows"-as-PRODUCT, etc.  Narrowed to
-    # the two labels that reliably mean "a named actor": people and
+    # REVIEW section 1.7: NORP (nationalities / religious / political
+    # groups) and PRODUCT were both listed originally but produce noise
+    # on specs -- "ISO"-as-NORP, "Windows"-as-PRODUCT, etc.  Narrowed
+    # to the two labels that reliably mean "a named actor": people and
     # organisations.  The canonicalisation helper filters further by
     # overlap with the user-supplied actors list where one exists.
     _NLP_ACTOR_LABELS = frozenset({"PERSON", "ORG"})
@@ -138,16 +140,18 @@ class ActorResolver:
         self,
         actors: Optional[Sequence[ActorEntry]] = None,
         use_nlp: bool = False,
+        use_heuristics: bool = False,
     ) -> None:
         self.actors: List[ActorEntry] = list(actors or [])
         self.use_nlp = use_nlp
+        self.use_heuristics = use_heuristics
         self._nlp = None
         if use_nlp:
             self._nlp = _try_load_spacy()
 
         # Pre-build a single regex for all alias forms, mapped back to canonical
         # names.  This is fast even on large specs.
-        self._alias_to_canonical: dict[str, str] = {}
+        self._alias_to_canonical: dict = {}
         patterns: List[str] = []
         for entry in self.actors:
             for form in entry.all_forms():
@@ -180,7 +184,7 @@ class ActorResolver:
         if self._actor_re is None or not text:
             return
         primary_lower = (primary or "").strip().lower()
-        seen: set[str] = set()
+        seen: set = set()
         for m in self._actor_re.finditer(text):
             canonical = self._alias_to_canonical[m.group(1).lower()]
             key = canonical.lower()
@@ -204,10 +208,10 @@ class ActorResolver:
         if self._nlp is None or not text:
             return
         primary_lower = (primary or "").strip().lower()
-        seen: set[str] = set()
+        seen: set = set()
         try:
             doc = self._nlp(text)
-        except Exception:  # noqa: BLE001 — NLP is best-effort
+        except Exception:  # noqa: BLE001 -- NLP is best-effort
             return
         # Build the canonical-name list once per call.  When no user
         # actors list is loaded, ``canonical`` is None and the
@@ -229,17 +233,46 @@ class ActorResolver:
             seen.add(key)
             yield cleaned
 
+    def iter_heuristic_hits(
+        self, text: str, primary: str = "",
+    ) -> Iterator[str]:
+        """Yield actor names from the rule-based heuristics fallback.
+
+        Rule-based -- no NLP or seed list required. See
+        :mod:`requirements_extractor.actor_heuristics` for the
+        per-rule documentation. Returns nothing when
+        ``use_heuristics=False`` (the default) so existing fixtures
+        that depend on no-secondary-actor behaviour stay green.
+        """
+        if not self.use_heuristics or not text:
+            return
+        # Local import keeps the heuristics module out of the import
+        # graph for callers that don't opt in -- the regex compile in
+        # that module is non-trivial.
+        from .actor_heuristics import extract_actor_candidates
+
+        primary_lower = (primary or "").strip().lower()
+        seen: set = set()
+        for cand in extract_actor_candidates(text, primary=primary):
+            key = cand.lower()
+            if key == primary_lower or key in seen:
+                continue
+            seen.add(key)
+            yield cand
+
     def iter_matches(
         self, text: str, primary: str = "",
     ) -> Iterator[Tuple[str, str]]:
         """Yield (name, source) tuples across all enabled passes.
 
-        ``source`` is ``"regex"`` or ``"nlp"``.  Cross-source dedup is
-        enforced: the same canonical name (case-insensitive) is emitted
-        at most once regardless of which pass discovered it.
+        ``source`` is ``"regex"``, ``"nlp"``, or ``"rule"``.  Cross-
+        source dedup is enforced: the same canonical name (case-
+        insensitive) is emitted at most once regardless of which pass
+        discovered it.  Order is regex -> nlp -> rule so the
+        higher-confidence sources win cross-source attribution.
         """
         primary_lower = (primary or "").strip().lower()
-        seen: set[str] = set()
+        seen: set = set()
         for name in self.iter_regex_hits(text, primary):
             key = name.lower()
             if key == primary_lower or key in seen:
@@ -252,6 +285,12 @@ class ActorResolver:
                 continue
             seen.add(key)
             yield (name, "nlp")
+        for name in self.iter_heuristic_hits(text, primary):
+            key = name.lower()
+            if key == primary_lower or key in seen:
+                continue
+            seen.add(key)
+            yield (name, "rule")
 
     def resolve(self, text: str, primary: str) -> List[str]:
         """Return a deduped list of secondary actor names found in ``text``."""
@@ -262,8 +301,8 @@ def load_actors_from_xlsx(path: Path) -> List[ActorEntry]:
     """Load an actor list from an Excel file.
 
     Expected columns (header row, case-insensitive):
-        Actor      — canonical name (required)
-        Aliases    — comma-separated alternates (optional)
+        Actor      -- canonical name (required)
+        Aliases    -- comma-separated alternates (optional)
     """
     from openpyxl import load_workbook
 
@@ -302,9 +341,10 @@ def _try_load_spacy():
 
     ``spacy.load`` can raise ``OSError`` (model directory missing),
     ``ImportError`` (model package not installed), ``ValueError`` (old
-    model incompatible with installed spacy), or — in edge cases with
-    spaCy's pydantic-based config — ``TypeError`` when the pydantic major
-    version mismatches.  All four are "spaCy isn't usable, move on".
+    model incompatible with installed spacy), or -- in edge cases with
+    spaCy's pydantic-based config -- ``TypeError`` when the pydantic
+    major version mismatches.  All four are "spaCy isn't usable, move
+    on".
     """
     try:
         import spacy  # type: ignore
