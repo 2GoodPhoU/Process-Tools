@@ -139,7 +139,8 @@ whole thing.
 | Area | Primary file(s) | Tests |
 |------|-----------------|-------|
 | Input routing (`.docx` / `.doc` / `.pdf`) | `legacy_formats.py` | `test_legacy_formats.py` |
-| Parsing (walker, event stream, procedural-table detection) | `parser.py` | `test_parser.py`, `test_procedural_tables.py` |
+| Parsing (walker, event stream) | `parser.py` | `test_parser.py` |
+| Procedural-table detection (header signal, multi-actor cell) | `procedural.py` | `test_procedural_tables.py` |
 | Classification (Hard / Soft / confidence) | `detector.py` | `test_detector.py` |
 | Actor resolution (regex + NLP + NER canonicalisation) | `actors.py` | `test_encapsulation.py`, `test_ner_canonicalisation.py` |
 | Stable IDs + cross-source dedup | `models.py` | `test_stable_ids.py` |

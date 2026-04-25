@@ -112,6 +112,7 @@ a = Analysis(
         "requirements_extractor.md_writer",
         "requirements_extractor.models",
         "requirements_extractor.parser",
+        "requirements_extractor.procedural",
         "requirements_extractor.reqif_writer",
         "requirements_extractor.statement_set",
         "requirements_extractor.writer",

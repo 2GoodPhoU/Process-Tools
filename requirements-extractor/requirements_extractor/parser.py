@@ -217,66 +217,6 @@ def _cell_intro_text(cell: _Cell) -> str:
     return " ".join(parts).strip()
 
 
-# ---------------------------------------------------------------------------
-# Procedural "required-action" table detection.
-#
-# Eric 2026-04-23 work-network pass: a recurring document shape is a
-# 3-column procedural table whose header row is literally:
-#
-#     |  (blank)  |  Step  |  Required Action  |
-#
-# Every body row of such a table is a requirement *by virtue of the header
-# shape*, regardless of whether the content sentence contains shall / must /
-# etc.  The column mapping is fixed: actor=1, step=2, content=3.
-#
-# Only tables matching this exact header take the force-requirement code
-# path; other 3-column tables (e.g. "Actor | Step | Required Action" with a
-# non-blank col-1 header) continue down the normal keyword-driven detection
-# path.  That gating matters — a blanket "3-column table = required-action
-# table" rule would light up every non-requirements roster that happens to
-# have three columns.
-# ---------------------------------------------------------------------------
-
-
-#: Expected header cells (lower-cased, whitespace-collapsed) for a
-#: required-action table.  The column-1 header is an empty string — that's
-#: part of the type signal.
-_REQUIRED_ACTION_HEADER = ("", "step", "required action")
-
-
-#: Synthetic keyword label for rows captured by the header signal rather
-#: than by a modal-keyword match.  Visible to reviewers in the output's
-#: Keywords column so they can tell which detection path fired.
-REQUIRED_ACTION_KEYWORD = "(Required Action)"
-
-
-def _normalise_header_cell(text: str) -> str:
-    """Return ``text`` lower-cased with internal whitespace collapsed.
-
-    Header comparisons are forgiving about casing and stray whitespace so
-    a fixture authored with ``Required Action`` and a document authored
-    with ``REQUIRED  ACTION`` or ``required\naction`` both match.
-    """
-    return " ".join((text or "").split()).lower()
-
-
-def is_required_action_header(row_cells_text: List[str]) -> bool:
-    """Return True iff ``row_cells_text`` matches the procedural header.
-
-    Takes a list of strings (the already-extracted text of each cell in a
-    candidate header row) rather than python-docx objects so it can be
-    unit-tested headlessly.  Matches exactly three cells with normalised
-    contents ``("", "step", "required action")``.
-
-    Case-insensitive and whitespace-tolerant: ``"Required  Action"`` /
-    ``"REQUIRED ACTION"`` / ``"  Required\nAction  "`` all match the
-    column-3 slot.
-    """
-    if len(row_cells_text) != 3:
-        return False
-    return tuple(_normalise_header_cell(c) for c in row_cells_text) == _REQUIRED_ACTION_HEADER
-
-
 def _update_heading_trail(trail: List[str], level: int, text: str) -> None:
     """Update the trail so index ``level - 1`` holds ``text``.
 
@@ -301,97 +241,29 @@ def _update_heading_trail(trail: List[str], level: int, text: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Multi-actor-cell resolution (FIELD_NOTES §4 case 3 / Eric 2026-04-23).
+
+
+# ---------------------------------------------------------------------------
+# Procedural-table detection — header signal + multi-actor cell parsing.
 #
-# In procedural required-action tables, column 1 may list several eligible
-# actors for a single step: "Auth Service, Gateway, Logger" or
-# "Auth Service / Gateway / Logger".  The requirement text itself then
-# picks which of the candidates actually performs the step ("The Gateway
-# shall forward...").  We parse the cell as a *set* of candidates and,
-# for each sentence, prefer the candidate whose name appears earliest in
-# the sentence.  Sentences that don't name any candidate fall back to the
-# joined cell text — preserving the caller's view that all candidates may
-# be involved.
+# The implementation lives in :mod:`procedural` (extracted in a refactor
+# — parser.py had grown to ~870 lines because procedural-table detection
+# was layered on top of the original 2-col walker).  Re-imported here
+# because :func:`_emit_candidate`, :func:`_walk_content`, and
+# :func:`parse_docx_events` all reference one or more of these helpers
+# inline.  Imports under their original underscore-prefixed names so
+# existing test imports (``from requirements_extractor.parser import
+# _split_candidate_actors``) continue to resolve via this module.
 # ---------------------------------------------------------------------------
 
-
-# Separators recognised when splitting a candidate-cell: comma, semicolon,
-# " / " (with spaces), " and " (word-bounded), " & " (spaces).  Matches
-# authors' common conventions; intentionally does NOT split on plain " "
-# since most single-actor names have internal spaces ("Auth Service").
-_CANDIDATE_SPLIT_RE = re.compile(
-    r"\s*[,;]\s*|\s+/\s+|\s+&\s+|\s+and\s+",
-    flags=re.IGNORECASE,
+from .procedural import (  # noqa: E402, F401 — re-exports for backward compat
+    REQUIRED_ACTION_KEYWORD,
+    is_required_action_header,
+    _normalise_header_cell,
+    _pick_primary,
+    _resolve_primary_from_candidates,
+    _split_candidate_actors,
 )
-
-
-def _split_candidate_actors(cell_text: str) -> List[str]:
-    """Parse a candidate-cell into a list of actor names.
-
-    Returns [] when the cell only names one actor (no separators) — the
-    caller should then treat the cell as a conventional single-actor
-    primary.  Trims each candidate and drops empty fragments so trailing
-    separators ("A, B,") don't produce ghost entries.
-    """
-    s = (cell_text or "").strip()
-    if not s:
-        return []
-    parts = [p.strip() for p in _CANDIDATE_SPLIT_RE.split(s)]
-    parts = [p for p in parts if p]
-    # A single-actor cell (no separators) still returns [s] from the split;
-    # the "multi-actor" signal is having at least two parts.
-    if len(parts) < 2:
-        return []
-    return parts
-
-
-def _pick_primary(
-    sentence: str,
-    default_primary: str,
-    candidates: Optional[List[str]],
-) -> str:
-    """Choose the effective primary actor for ``sentence``.
-
-    When ``candidates`` is falsy, just returns ``default_primary``
-    unchanged — callers who don't care about multi-actor resolution get
-    the existing behaviour.  When candidates are present, tries to
-    resolve from the sentence subject; falls back to ``default_primary``
-    if no candidate appears in the sentence.  This keeps rows whose
-    text doesn't name a specific candidate attributed to the full
-    candidate list (the joined cell text) rather than silently dropping
-    them to an empty actor.
-    """
-    if not candidates:
-        return default_primary
-    picked = _resolve_primary_from_candidates(sentence, candidates)
-    return picked if picked is not None else default_primary
-
-
-def _resolve_primary_from_candidates(
-    sentence: str, candidates: List[str]
-) -> Optional[str]:
-    """Pick the candidate whose name appears earliest in ``sentence``.
-
-    Returns ``None`` when no candidate name is found, so the caller can
-    decide what fallback to use (typically: the joined cell text).  Case-
-    and word-boundary aware — ``"Authentication Service"`` will not match
-    a candidate named ``"Auth Service"``.
-    """
-    if not sentence or not candidates:
-        return None
-    lower_sent = sentence.lower()
-    best: Optional[tuple] = None  # (position, candidate)
-    for cand in candidates:
-        if not cand:
-            continue
-        pattern = r"\b" + re.escape(cand.lower()) + r"\b"
-        m = re.search(pattern, lower_sent)
-        if m is None:
-            continue
-        pos = m.start()
-        if best is None or pos < best[0]:
-            best = (pos, cand)
-    return best[1] if best else None
 
 
 #: Re-exported for the force-requirement path so a future confidence
