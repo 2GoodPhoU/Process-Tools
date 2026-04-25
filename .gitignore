@@ -58,3 +58,11 @@ desktop.ini
 # The canonical examples live in samples/ already.
 requirements-extractor/requirements.xlsx
 requirements-extractor/requirements_statement_set.csv
+
+# Stray .bak files left from refactors (cannot delete via VM).
+*.py.bak
+# Sandbox write-test markers.
+test_write_marker.tmp
+
+# Local BPMN/PlantUML smoke-test outputs (regenerable via run_cli.py).
+nimbus-skeleton/sample-output/
