@@ -7,4 +7,4 @@ binary formats.
 
 from . import bpmn, manifest, plantuml, vsdx, xmi
 
-__all__ = ["plantuml", "manifest", "xmi", "v
+__all__ = ["plantuml", "manifest", "xmi", "vsdx", "bpmn"]
