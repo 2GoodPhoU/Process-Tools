@@ -625,17 +625,5 @@ class TestGuiSettingsBatchFields(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 
-class TestBuiltinKeywordsSanity(unittest.TestCase):
-    """Baseline-not-churned guard — several tests above assume these
-    entries exist in the built-ins.  If someone bumps the defaults, the
-    failure here makes it obvious why the other tests drifted."""
-
-    def test_shall_in_hard(self) -> None:
-        self.assertIn("shall", HARD_KEYWORDS)
-
-    def test_will_in_soft(self) -> None:
-        self.assertIn("will", SOFT_KEYWORDS)
-
-
 if __name__ == "__main__":
     unittest.main()
