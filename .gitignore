@@ -6,6 +6,7 @@ __pycache__/
 
 # ---- Virtual environments ----
 .venv/
+.venv-*/
 venv/
 env/
 ENV/
@@ -66,3 +67,6 @@ test_write_marker.tmp
 
 # Local BPMN/PlantUML smoke-test outputs (regenerable via run_cli.py).
 nimbus-skeleton/sample-output/
+
+# Diagnostic output files from manual test runs (don't commit).
+test_output.txt

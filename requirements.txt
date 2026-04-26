@@ -1,0 +1,23 @@
+# Workshop-wide runtime requirements.
+#
+# Install these once into whichever Python you use to run the test
+# suites (system Python, pyenv version, or a venv). Then
+# `.\scripts\test_all.ps1` (Windows) or `bash scripts/test_all.sh`
+# (Linux/macOS/Git Bash) will run all 600 tests across the four tools.
+#
+#     pip install -r requirements.txt
+#
+# Per-tool requirements files still exist for narrower installs:
+#   - requirements-extractor/requirements.txt
+#   - requirements-extractor/requirements-optional.txt   (spaCy, tkinterdnd2, pdfplumber)
+#   - requirements-extractor/packaging/build-requirements.txt
+#
+# Optional extras (not needed for the test suite):
+#   - spacy + en_core_web_sm  -- only for DDE's NER pass; tests run fine without it
+#   - tkinterdnd2             -- GUI drag-and-drop
+#   - pdfplumber              -- PDF input support
+
+# Core runtime deps shared across all four tools:
+openpyxl>=3.0    # xlsx I/O — used by every tool
+pyyaml>=5.4      # YAML config / manifests / manual mappings
+python-docx>=0.8 # .docx parsing — DDE only, but the cross-tool integration tests need it

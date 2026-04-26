@@ -6,6 +6,52 @@ versions follow [SemVer](https://semver.org/spec/v2.0.0.html).
 Pre-1.0 behaviour: minor versions may include breaking CLI / output-shape
 changes — they will always be called out under a **Breaking** subhead.
 
+## [Unreleased]
+
+### Added — fuzzy-id matcher (5th matcher)
+- `compliance_matrix/matchers/fuzzy_id.py` (~225 lines, pure-stdlib
+  Levenshtein implementation — no `rapidfuzz` dependency). Fires on
+  section / clause IDs that differ between contract and procedure by
+  spelling variation, formatting drift (e.g. `DO-178C Section 6.3.1`
+  vs `6.3.1`), or typos.
+- `--fuzzy-id-threshold` CLI flag (default 0.85) for the
+  Levenshtein-distance cutoff.
+- `--no-fuzzy-id` CLI flag to skip the matcher.
+- 20 unit tests in `tests/test_fuzzy_id.py` covering the Levenshtein
+  primitive, ID normalisation, threshold boundaries, and corpus-level
+  matching behaviour. Total suite is now 23 tests.
+
+### Added — shared loader
+- `compliance_matrix/loader.py` is now a thin wrapper over
+  `process_tools_common.dde_xlsx`. Adding or renaming a DDE column
+  is a one-line change in the shared package — both consumer tools
+  pick it up.
+
+### Fixed
+- `combiner.DEFAULT_WEIGHTS` now includes an explicit `fuzzy_id: 0.95`
+  weight (REFACTOR.md item S1). Previously the matcher fired correctly
+  but its score multiplied by the `weights.get(..., 0.5)` fallback;
+  documentation had advertised 0.60 then 0.95 — neither matched
+  reality. Tightened with a regression test in `test_combiner.py`
+  that asserts every shipped matcher has an entry in
+  `DEFAULT_WEIGHTS`.
+
+### Changed — CLI plumbing
+- `--quiet` flag and the quiet-aware logger are now centralised in
+  `process_tools_common.cli_helpers` (`add_quiet_flag`, `make_logger`).
+  No user-visible behaviour change; the local boilerplate is gone.
+
+### Changed — loader
+- `compliance_matrix/loader.py` is further thinned over the shared
+  `process_tools_common.dde_xlsx.load_into` helper. Previously
+  duplicated the iterate-and-filter loop in both consumer tools;
+  centralising it means a future schema change in
+  `iter_dde_records` is picked up by both consumers automatically.
+
+### Test count
+- Total suite is now **30 tests** (3 smoke + 20 fuzzy-id + 7 new
+  combiner regression tests).
+
 ## [0.1.0] — 2026-04-24
 
 Initial scaffold. End-to-end pipeline operational, 3 smoke tests

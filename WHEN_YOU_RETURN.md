@@ -1,26 +1,27 @@
 # When you return — start here
 
-**Open `ACTION_ITEMS.md` first.** It's the consolidated overnight log.
+The current canonical entry points are:
 
-## Top-priority decision (5 min)
+1. **[`ROADMAP.md`](./ROADMAP.md)** — unified roadmap across all four
+   tools (Shipped / In Progress / Next / Later, plus risk register).
+2. **[`REFACTOR.md`](./REFACTOR.md)** — refactor punch list with
+   sign-off per item. Stability + dedup + trim findings, sized and
+   risk-rated.
+3. **[`COMMIT_PLAN.md`](./COMMIT_PLAN.md)** — current working-tree
+   state and suggested commit grouping.
 
-Three top-level dirs are **untracked in git** with no nested `.git/` and no
-`.gitignore` rule excluding them: `compliance-matrix/`, `nimbus-skeleton/`,
-`process-tools-common/`. Most likely "never `git add`-ed yet". Decide:
-either `git add` them as part of the monorepo, or add them to
-`.gitignore` if they're meant to live separately. See Phase 0 in
-`ACTION_ITEMS.md` for the integrity check details.
+`ACTION_ITEMS.md` is the historical overnight log (2026-04-25);
+its Phase 0 finding has been resolved and its open items migrated
+into `ROADMAP.md` / `REFACTOR.md`.
 
-## What shipped overnight
+## Workshop state at a glance
 
-- `nimbus-skeleton`: **BPMN 2.0 emitter** (`--bpmn` flag, +14 tests)
-- `requirements-extractor`: **rule-based actor-extraction fallback**
-  (10 heuristics, opt-in, +36 tests)
-- Two files were truncation-recovered earlier (`cli.py`, `actors.py`) —
-  diff carefully before committing.
-
-## Suggested order
-
-`ACTION_ITEMS.md` → review diffs → run the three test suites
-(`requirements-extractor` 505, `nimbus-skeleton` 33, `compliance-matrix`
-23) → commit when satisfied.
+- **570 tests across the workshop** — DDE 505, nimbus-skeleton 33,
+  compliance-matrix 30 (after S1's regression test addition),
+  process-tools-common 9.
+- **Strategic context:** TIBCO Nimbus on-prem retired 2025-09-01;
+  BPMN 2.0 is the forward-target interchange format. The
+  `nimbus-skeleton` tool ships both `.vsdx` (legacy Nimbus) and
+  `.bpmn` (Camunda / bpmn.io / etc.) emitters.
+- **Run all tests:** `cd <tool>/ && python -m unittest discover tests`
+  for each of the four tools.

@@ -2,7 +2,7 @@
 
 Thin wrapper over the shared ``process_tools_common.dde_xlsx`` package.
 The shared module yields a full superset of fields per row; this
-module filters to the subset the skeleton builder needs (no
+module restricts to the subset the skeleton builder needs (no
 ``block_ref`` / ``keywords`` / ``confidence`` / ``notes`` / ``context``
 — those add no value to a swimlane-and-flow diagram).
 """
@@ -22,8 +22,8 @@ if _COMMON_ROOT.is_dir() and str(_COMMON_ROOT) not in sys.path:
     sys.path.insert(0, str(_COMMON_ROOT))
 
 from process_tools_common.dde_xlsx import (  # noqa: E402
-    iter_dde_records,
     load_actor_aliases,
+    load_into,
 )
 
 from .models import DDERow
@@ -47,11 +47,7 @@ _ALLOWED_FIELDS = {
 def load_dde_xlsx(path):
     """Load a DDE requirements workbook in source-document order."""
 
-    out: List[DDERow] = []
-    for record in iter_dde_records(path):
-        filtered = {k: v for k, v in record.items() if k in _ALLOWED_FIELDS}
-        out.append(DDERow(**filtered))
-    return out
+    return load_into(path, DDERow, fields=_ALLOWED_FIELDS)
 
 
 def load_actors_xlsx(path):

@@ -1,0 +1,13 @@
+@startuml
+title Process Skeleton
+start
+|Operator|
+:The Operator shall log in to the control console and confirm the previous…;
+|Supervisor|
+:The Supervisor must review the overnight alarm log before releasing the…;
+|Operator|
+:The Operator shall verify that all subsystem status indicators read nominal;
+|Supervisor|
+:The Supervisor must countersign the handover log once the checks are complete;
+stop
+@enduml

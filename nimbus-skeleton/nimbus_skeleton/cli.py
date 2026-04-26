@@ -30,8 +30,11 @@ from pathlib import Path
 from . import __version__
 from .builder import build_skeleton
 from .emitters import bpmn, manifest, plantuml, vsdx, xmi
-from .loader import load_actors_xlsx, load_dde_xlsx
+from .loader import load_actors_xlsx, load_dde_xlsx  # also bootstraps process_tools_common on sys.path
 from .review_writer import write_review
+
+# Shared helpers — loader.py already added process-tools-common to sys.path.
+from process_tools_common.cli_helpers import add_quiet_flag, make_logger
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -99,12 +102,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
             "research/2026-04-25-stack-alternatives-survey.md."
         ),
     )
-    parser.add_argument(
-        "-q",
-        "--quiet",
-        action="store_true",
-        help="Suppress progress output (errors still print).",
-    )
+    add_quiet_flag(parser)
     return parser
 
 
@@ -112,7 +110,7 @@ def main(argv=None):
     parser = build_arg_parser()
     args = parser.parse_args(argv)
 
-    log = (lambda *a, **kw: None) if args.quiet else print
+    log = make_logger(args.quiet)
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
 

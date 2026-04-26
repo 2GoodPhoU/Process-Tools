@@ -10,12 +10,17 @@ Default weights:
 
     explicit_id     1.00   gold standard
     manual_mapping  1.00   gold standard
+    fuzzy_id        0.95   near-gold; small Levenshtein delta on canonical IDs
     similarity      0.85   solid signal but tunable
     keyword_overlap 0.65   noisy, downweighted
 
 The weights only affect the *combined* score, never the per-matcher
 votes recorded on the ``CombinedMatch``. A matcher that returned 0.4
 with weight 0.65 contributes a weighted score of 0.26 toward the max.
+
+A matcher whose name is not in ``DEFAULT_WEIGHTS`` falls back to 0.5.
+This is intentional safety net behaviour for experimental matchers,
+not a target — every shipped matcher should have an explicit weight.
 """
 
 from __future__ import annotations
@@ -28,6 +33,7 @@ from .models import CombinedMatch, Match
 DEFAULT_WEIGHTS: Dict[str, float] = {
     "explicit_id": 1.0,
     "manual_mapping": 1.0,
+    "fuzzy_id": 0.95,
     "similarity": 0.85,
     "keyword_overlap": 0.65,
 }

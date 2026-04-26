@@ -17,9 +17,12 @@ from pathlib import Path
 
 from . import __version__
 from .combiner import combine
-from .loader import load_pair
+from .loader import load_pair  # noqa: F401  (also bootstraps process_tools_common on sys.path)
 from .matchers import explicit_id, fuzzy_id, keyword_overlap, manual_mapping, similarity
 from .matrix_writer import write_matrix
+
+# Shared helpers — loader.py already added process-tools-common to sys.path.
+from process_tools_common.cli_helpers import add_quiet_flag, make_logger
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -99,12 +102,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default=0.85,
         help="Fuzzy-id matcher similarity threshold (default: 0.85, range 0.0-1.0).",
     )
-    parser.add_argument(
-        "-q",
-        "--quiet",
-        action="store_true",
-        help="Suppress progress output (errors still print).",
-    )
+    add_quiet_flag(parser)
     return parser
 
 
@@ -112,7 +110,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_arg_parser()
     args = parser.parse_args(argv)
 
-    log = (lambda *a, **kw: None) if args.quiet else print
+    log = make_logger(args.quiet)
 
     log(f"Loading {args.contract.name} (contract side)...")
     contract_rows, procedure_rows = load_pair(args.contract, args.procedure)

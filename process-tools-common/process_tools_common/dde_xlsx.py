@@ -15,14 +15,27 @@ type narrow to just the fields each tool actually uses.
 The loader matches columns by **header name** (case-insensitive,
 whitespace-collapsed) rather than position so a future DDE schema
 change that adds or reorders columns doesn't break consumers.
+
+Helper helpers (added 2026-04-25):
+
+* ``load_into(path, row_factory, fields=None)`` — common loader
+  pattern: iterate, filter to a field subset, hand each dict to a
+  factory. Both consumer tools have nearly-identical loops; this
+  centralises them.
+* ``find_sidecar(input_path, *, suffix)`` — convention helper for
+  "look up the actors xlsx beside the input file." Returns the
+  expected sidecar path if it exists, else ``None``.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, Iterator, List, Optional
+from typing import Callable, Dict, Iterable, Iterator, List, Optional, TypeVar
 
 from openpyxl import load_workbook
+
+
+T = TypeVar("T")
 
 
 # Header name (normalised) → canonical attribute name. Adding a new
@@ -177,3 +190,56 @@ def load_actor_aliases(path: str | Path) -> Dict[str, List[str]]:
     """Return ``{canonical: [aliases]}`` from a DDE actors xlsx."""
 
     return {rec["actor"]: rec["aliases"] for rec in iter_actor_records(path)}
+
+
+def load_into(
+    path: str | Path,
+    row_factory: Callable[..., T],
+    *,
+    fields: Optional[Iterable[str]] = None,
+) -> List[T]:
+    """Load a DDE xlsx and project each row through ``row_factory``.
+
+    Both downstream tools (compliance-matrix, nimbus-skeleton) had
+    near-identical "iterate, filter to known fields, build domain row"
+    loops. This helper takes a callable — typically a dataclass
+    constructor — and a whitelist of field names. Each yielded dict
+    from ``iter_dde_records`` is filtered to the whitelisted keys
+    (if any) and passed as keyword arguments to ``row_factory``.
+
+    Pass ``fields=None`` to forward every key in the dict (no
+    filtering — useful when the row type accepts arbitrary kwargs).
+    """
+
+    if fields is None:
+        return [row_factory(**rec) for rec in iter_dde_records(path)]
+
+    allowed = set(fields)
+    return [
+        row_factory(**{k: v for k, v in rec.items() if k in allowed})
+        for rec in iter_dde_records(path)
+    ]
+
+
+def find_sidecar(
+    input_path: str | Path,
+    *,
+    suffix: str,
+    extension: str = ".xlsx",
+) -> Optional[Path]:
+    """Look for a sidecar file next to ``input_path`` and return it if present.
+
+    Convention: a sidecar is a file in the same directory as
+    ``input_path``, with the same stem plus a discriminating suffix
+    and an extension. For example, given ``contract.xlsx`` and
+    ``suffix="_actors"``, this looks for ``contract_actors.xlsx``.
+
+    Returns the ``Path`` if the sidecar exists, otherwise ``None``.
+    Both tools today use this convention for the actors workbook;
+    centralising the lookup means a typo in one consumer doesn't
+    silently miss a real sidecar.
+    """
+
+    input_path = Path(input_path)
+    candidate = input_path.with_name(f"{input_path.stem}{suffix}{extension}")
+    return candidate if candidate.is_file() else None

@@ -6,6 +6,68 @@ versions follow [SemVer](https://semver.org/spec/v2.0.0.html).
 Pre-1.0 behaviour: minor versions may include breaking CLI / output-shape
 changes — they will always be called out under a **Breaking** subhead.
 
+## [Unreleased]
+
+### Added — BPMN 2.0 emitter (5th output format)
+- `nimbus_skeleton/emitters/bpmn.py` (~270 lines). Full element
+  coverage: `<bpmn:definitions>` root with proper namespaces (BPMN,
+  BPMNDI, DC, DI, XSI), `<bpmn:collaboration>` + `<bpmn:participant>`
+  (single-pool wrapper), `<bpmn:process>` with `<bpmn:laneSet>` /
+  `<bpmn:lane>` per actor (swimlanes), `<bpmn:task>` per activity
+  (with `<bpmn:documentation>` for flagged ones),
+  `<bpmn:exclusiveGateway>` per gateway (XOR — closest 1:1 for the
+  single-condition Skeleton model), `<bpmn:startEvent>` /
+  `<bpmn:endEvent>` bracketing, `<bpmn:sequenceFlow>` edges (each
+  node also declares its `<bpmn:incoming>` / `<bpmn:outgoing>` —
+  Camunda Modeler is strict about this), `<bpmn:textAnnotation>` +
+  `<bpmn:association>` for free-text notes.
+- Hand-built XML using `xml.sax.saxutils.escape` + `quoteattr`,
+  mirroring the XMI emitter convention. Byte-stable across runs.
+- BPMNDI graphical layout intentionally omitted — modern BPMN tools
+  auto-layout on import; arbitrary pixel coordinates would just be
+  wrong.
+- Wired into `cli.py` as `--bpmn` flag (additive — existing emitters
+  unchanged). Default off so the standard 5-file output stays
+  unchanged unless explicitly requested.
+- 14 tests in `tests/test_bpmn_emitter.py`: structural round-trip
+  (parse-and-assert), byte-stability, ID safety (special-char actor
+  names yield NCName-valid IDs), empty-skeleton case, CLI flag
+  wiring.
+
+### Added — review-writer enhancement
+- `review_writer.py` now takes optional `dde_rows=None` and adds a
+  "Source Requirement" column when DDE rows are passed through.
+  Reviewers can see the original requirement text alongside the
+  flagged-activity row without opening the input xlsx separately.
+- 3 new tests in `tests/test_review_writer.py`.
+
+### Added — shared loader
+- `nimbus_skeleton/loader.py` is now a thin wrapper over
+  `process_tools_common.dde_xlsx`. Adding or renaming a DDE column
+  is a one-line change in the shared package — both consumer tools
+  pick it up.
+
+### Strategic context
+- TIBCO Nimbus on-premise retired 2025-09-01 (no new subscriptions,
+  no renewals). BPMN 2.0 is the strategic interchange format going
+  forward. The Visio (`.vsdx`) emitter remains shipped for any
+  Nimbus instance still in operation. Captured in
+  `requirements-extractor/research/2026-04-25-stack-alternatives-survey.md`.
+
+### Test count
+- Total suite is now **33 tests** (16 from prior 0.1.0 + 14 BPMN
+  + 3 review-writer enhancement).
+
+### Changed — CLI plumbing
+- `--quiet` flag and the quiet-aware logger are now centralised in
+  `process_tools_common.cli_helpers` (`add_quiet_flag`, `make_logger`).
+  No user-visible behaviour change; the local boilerplate is gone.
+
+### Changed — loader
+- `nimbus_skeleton/loader.py` is further thinned over the shared
+  `process_tools_common.dde_xlsx.load_into` helper. The DDE→DDERow
+  projection loop now lives in one place across both consumer tools.
+
 ## [0.1.0] — 2026-04-24
 
 Initial scaffold. Pipeline DDE xlsx → swimlane-and-flow skeleton →

@@ -1,21 +1,23 @@
 # Nimbus Skeleton Mapper
 
-Turn DDE-extracted requirements into a starter UML activity-diagram
+Turn DDE-extracted requirements into a starter process-model
 skeleton: swimlanes per actor, action nodes from imperative
 requirements, sequence flows from document order, decision gateways
-from conditional language. Designed as a head-start for hand-finishing
-in TIBCO Nimbus or any other UML / BPM tool.
+from conditional language. Designed as a head-start for
+hand-finishing in any modern BPMN or UML tool — historically TIBCO
+Nimbus, now also Camunda Modeler, bpmn.io, Cameo, Enterprise
+Architect, MagicDraw, Papyrus, etc.
 
 ## Status
 
-**Scaffold complete, all five emitters live, end-to-end smoke test
-green.** PlantUML, YAML manifest, UML 2.5 XMI, **and native Visio
-(`.vsdx`)** are all working; review side-car xlsx surfaces every
-flagged item. The `.vsdx` uses NameU values that match TIBCO Nimbus's
-default Visio import rules (Process / Decision / Dynamic connector),
-so `File → Import/Export → Import from Visio` should land it as
-proper Nimbus shapes without rules-file tweaking. Phase 3 candidates — see
-[Phase 2 — Visio import path](#phase-2--visio-import-path) below.
+**All five emitters live, 33 tests passing.** PlantUML, YAML manifest,
+UML 2.5 XMI, native Visio (`.vsdx`), **and BPMN 2.0** are all working;
+review side-car xlsx surfaces every flagged item. The `.vsdx` uses
+NameU values that match TIBCO Nimbus's default Visio import rules
+(Process / Decision / Dynamic connector). The `.bpmn` (opt-in via
+`--bpmn`) is the strategic interchange format post-Nimbus on-premise
+retirement (2025-09-01) — it imports cleanly into Camunda Modeler,
+bpmn.io, and most modern BPMN tools.
 
 ## How it works
 
@@ -28,7 +30,9 @@ proper Nimbus shapes without rules-file tweaking. Phase 3 candidates — see
                                                   │                     │
                                                   │                     ├─▶ skeleton.xmi   (UML 2.5)
                                                   │                     │
-                                                  │                     ├─▶ skeleton.vsdx  (Nimbus path)
+                                                  │                     ├─▶ skeleton.vsdx  (Visio / Nimbus)
+                                                  │                     │
+                                                  │                     ├─▶ skeleton.bpmn  (BPMN 2.0, opt-in)
                                                   │                     │
                                                   └─────────────────────┴─▶ skeleton.review.xlsx
 ```
@@ -49,13 +53,15 @@ Pipeline stages:
    instant viz; YAML manifest as the tool-neutral pivot; UML 2.5 XMI
    for Cameo / EA / MagicDraw / Papyrus / any UML tool that speaks
    XMI; native Visio (`.vsdx`) with stencil-named shapes for the
-   TIBCO Nimbus import path.
+   TIBCO Nimbus import path; BPMN 2.0 XML for any modern BPMN tool
+   (Camunda Modeler, bpmn.io, etc.) — opt-in via `--bpmn`.
 5. **Review writer** drops every `flagged=True` activity into a
    single-sheet xlsx side-car for human triage.
 
 ## Outputs
 
-Every run produces five files in `--output-dir`:
+Every run produces five files by default in `--output-dir`. Adding
+`--bpmn` produces a sixth.
 
 | File                     | What it's for                                        |
 |--------------------------|------------------------------------------------------|
@@ -70,9 +76,16 @@ Every run produces five files in `--output-dir`:
 |                          | default Visio-import rules. Drop into Nimbus via     |
 |                          | File → Import/Export → Import from Visio. Inner      |
 |                          | page1.xml is byte-stable across runs                 |
+| `skeleton.bpmn`          | BPMN 2.0 XML (opt-in via `--bpmn`). Lanes per actor, |
+|                          | tasks for activities, exclusive gateways, sequence   |
+|                          | flows. BPMNDI graphical layout intentionally omitted |
+|                          | — modern BPMN tools auto-layout on import. Imports   |
+|                          | into Camunda Modeler, bpmn.io, and most modern BPMN  |
+|                          | tools                                                |
 | `skeleton.review.xlsx`   | Side-car listing every flagged activity (negative    |
 |                          | polarity, no modal verb, conditional branches, etc.) |
-|                          | with a Reviewer Decision column                      |
+|                          | with a Reviewer Decision column. Includes a "Source  |
+|                          | Requirement" column when DDE rows are passed through |
 
 ## Quick start
 
@@ -150,10 +163,11 @@ nimbus-skeleton --requirements R.xlsx --output-dir D/
 | `--requirements` | Required. DDE requirements xlsx.                  |
 | `--actors`       | Optional. DDE actors xlsx for alias resolution.   |
 | `--output-dir`   | Required. Created if absent.                       |
-| `--basename`     | Filename prefix for the three outputs (default `skeleton`). |
-| `--title`        | Diagram title shown in PlantUML / manifest / XMI.  |
+| `--basename`     | Filename prefix for outputs (default `skeleton`).  |
+| `--title`        | Diagram title shown in PlantUML / manifest / XMI / BPMN. |
 | `--no-xmi`       | Skip the XMI emitter (useful for fast iteration).  |
 | `--no-vsdx`      | Skip the Visio (.vsdx) emitter.                    |
+| `--bpmn`         | Emit BPMN 2.0 XML (`<basename>.bpmn`). Default off. |
 
 ## Visio import path (now shipped — was Phase 2)
 
@@ -203,26 +217,74 @@ preferred). The diagram lands as a fresh map.
 The YAML manifest's stable schema means the `vsdx` emitter can be
 added without any changes to the loader, classifier, or builder.
 
+## BPMN 2.0 import path (shipped 2026-04-25)
+
+TIBCO Nimbus on-premise retired on 2025-09-01 (no new subscriptions,
+no renewals). BPMN 2.0 — the ISO/IEC 19510 process-modelling standard —
+is the strategic interchange format going forward, with broad support
+across Camunda Modeler, bpmn.io, Signavio, and most other modern
+BPMN tools.
+
+The emitter (`emitters/bpmn.py`) walks the in-memory `Skeleton` and
+produces a BPMN 2.0 XML file with:
+
+- `<bpmn:definitions>` root with the standard namespaces.
+- `<bpmn:collaboration>` + `<bpmn:participant>` (single-pool wrapper).
+- `<bpmn:process>` containing `<bpmn:laneSet>` / `<bpmn:lane>` per
+  actor (swimlanes).
+- `<bpmn:task>` per activity, with `<bpmn:documentation>` for flagged
+  items.
+- `<bpmn:exclusiveGateway>` per gateway (XOR — closest 1:1 mapping
+  for the single-condition Skeleton model).
+- `<bpmn:startEvent>` / `<bpmn:endEvent>` bracketing.
+- `<bpmn:sequenceFlow>` edges; each node also declares its
+  `<bpmn:incoming>` / `<bpmn:outgoing>` (Camunda Modeler is strict
+  about this).
+- `<bpmn:textAnnotation>` + `<bpmn:association>` for free-text notes.
+
+Hand-built XML using `xml.sax.saxutils.escape` + `quoteattr`, mirroring
+the XMI emitter convention. **Byte-stable across runs.** BPMNDI
+graphical layout (pixel coordinates) is intentionally omitted — modern
+BPMN tools auto-layout on import, and writing arbitrary coordinates
+would just look wrong.
+
+Quick start for BPMN output:
+
+```bash
+nimbus-skeleton --requirements REQS.xlsx --output-dir OUT/ --bpmn
+# adds <basename>.bpmn alongside the standard 5 outputs.
+```
+
+Validation: open the resulting `.bpmn` in
+[Camunda Modeler](https://camunda.com/download/modeler/) or
+[bpmn.io](https://demo.bpmn.io/) to confirm it imports cleanly.
+
 ## Project layout
 
 ```
 nimbus-skeleton/
+├── CHANGELOG.md
 ├── README.md
 ├── run_cli.py                          (CLI shortcut)
 ├── nimbus_skeleton/
 │   ├── __init__.py
 │   ├── models.py                       (DDERow, Activity, Gateway, Note, Skeleton)
-│   ├── loader.py                       (DDE xlsx → DDERow / actors)
+│   ├── loader.py                       (thin wrapper over process-tools-common)
 │   ├── classifier.py                   (activity / gateway / note decision)
 │   ├── builder.py                      (DDERow list → Skeleton)
 │   ├── review_writer.py                (flagged-items side-car xlsx)
 │   ├── cli.py                          (argparse entry point)
 │   └── emitters/
 │       ├── __init__.py
-│       ├── plantuml.py
-│       └── manifest.py                 (tool-neutral YAML pivot)
+│       ├── plantuml.py                 (PlantUML activity-diagram syntax)
+│       ├── manifest.py                 (tool-neutral YAML pivot)
+│       ├── xmi.py                      (UML 2.5 XMI / OMG)
+│       ├── vsdx.py                     (native Visio for Nimbus import)
+│       └── bpmn.py                     (BPMN 2.0 XML)
 └── tests/
-    └── test_smoke.py
+    ├── test_smoke.py                   (loader / classifier / builder / 4 emitters)
+    ├── test_review_writer.py           (review side-car)
+    └── test_bpmn_emitter.py            (BPMN structural / byte-stability / CLI)
 ```
 
 ## Dependencies
@@ -230,6 +292,8 @@ nimbus-skeleton/
 - `openpyxl` — already pulled in by DDE (used for loading + review xlsx).
 - `pyyaml` — optional. Without it, the manifest emitter falls back to
   JSON.
+- `process-tools-common` — sibling package, wired in via a small
+  `sys.path` bootstrap in `loader.py`.
 
 ## Open questions for next iteration
 
@@ -237,13 +301,17 @@ nimbus-skeleton/
   requirement without a modal verb as "needs confirmation." On real
   spec corpora this may be too aggressive — once we have data, tune
   toward precision over recall.
-- **Visio (`.vsdx`) emitter.** Phase 2 deliverable. Page citations
-  above.
+- **BPMN modeler validation.** Round-trip + structural tests cover
+  ~80% of likely failure modes; the remaining 20% is "the modeler
+  refuses to import for a subtle reason." Mitigation is opening the
+  output in Camunda Modeler / bpmn.io against a real DDE-derived
+  skeleton.
+- **`Skeleton.Gateway` `kind` field** (parallel / inclusive / exclusive)
+  feeding the BPMN emitter so gateways aren't all collapsed to XOR.
 - **Loop / parallel detection.** Currently the builder emits a strict
   linear flow. A future version could detect cycles (the same activity
   ID flowing back into itself) and parallel branches (multiple flows
   exiting the same node) — but only after the linear case is solid
   on real specs.
-- **Loader sharing with `compliance-matrix/`.** Both tools duplicate
-  the DDE-xlsx loader. Once both are stable, extract into a shared
-  `process_tools_common/` package.
+- **XSD validation test** for the BPMN output if a public BPMN 2.0
+  XSD becomes available offline at Eric's site.

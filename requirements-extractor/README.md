@@ -586,6 +586,7 @@ requirements-extractor/                (folder name — Python pkg kept for comp
     ├── config.py                      (user-supplied config + keywords override)
     ├── keywords_loader.py             (standalone keywords-file parser)
     ├── actors.py                      (primary + secondary actor resolution + NER canonicalisation)
+    ├── actor_heuristics.py            (10 rule-based actor heuristics — opt-in fallback when NLP is unavailable)
     ├── actor_scan.py                  (actors-only extraction mode)
     ├── parser.py                      (walks the .docx into an event stream — incl. procedural-table detection)
     ├── procedural.py                  (procedural-table detection + multi-actor cell parsing)

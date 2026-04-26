@@ -1,7 +1,16 @@
 # Process-Tools — Consolidated Action Items
 
-**Last updated:** 2026-04-25 (overnight session)
-**Status:** All work uncommitted; Eric reviews and commits in the morning.
+**Last updated:** 2026-04-25 (overnight session — superseded by ROADMAP.md / REFACTOR.md / COMMIT_PLAN.md, see below)
+**Status:** Phase 0 RESOLVED (the three top-level dirs were already
+committed); active items have been migrated to ROADMAP.md and
+REFACTOR.md. This file is kept as the historical record of the
+overnight session.
+
+> **Pointer for future sessions.** Start with
+> [`ROADMAP.md`](./ROADMAP.md) (unified roadmap) and
+> [`REFACTOR.md`](./REFACTOR.md) (refactor punch list with sign-off
+> per item). Ignore the "morning TODO" block below — it has been
+> migrated to those documents.
 
 ---
 
@@ -22,7 +31,15 @@
 
 ---
 
-## Phase 0 — Integrity / git tracking findings (no fixes applied)
+## Phase 0 — Integrity / git tracking findings — **RESOLVED 2026-04-25**
+
+> **Status update (later 2026-04-25).** The three "untracked"
+> directories called out below were committed in `git log` entries
+> `76b4993` (compliance-matrix), `aac5728` (nimbus-skeleton), and
+> the `cfc8ef7` series (process-tools-common). The Phase 0 finding
+> below was **already resolved** by the time of this update — the
+> doc is what was stale, not the repo. Original finding kept below
+> as historical record.
 
 `git status` at repo root shows:
 

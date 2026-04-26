@@ -1,10 +1,9 @@
 """Read DDE xlsx workbooks into compliance-matrix ``DDERow`` instances.
 
 Thin wrapper over the shared ``process_tools_common.dde_xlsx`` package
-that handles the actual xlsx reading. This module's job is to convert
-the shared dict shape into compliance-matrix's domain ``DDERow``,
-attaching the ``side`` discriminator ("contract" or "procedure") that
-the matchers and writer rely on.
+that handles the actual xlsx reading and the iterate-and-filter loop.
+This module's job is just to attach the ``side`` discriminator
+("contract" or "procedure") that the matchers and writer rely on.
 """
 
 from __future__ import annotations
@@ -21,15 +20,15 @@ _COMMON_ROOT = Path(__file__).resolve().parents[2] / "process-tools-common"
 if _COMMON_ROOT.is_dir() and str(_COMMON_ROOT) not in sys.path:
     sys.path.insert(0, str(_COMMON_ROOT))
 
-from process_tools_common.dde_xlsx import iter_dde_records  # noqa: E402
+from process_tools_common.dde_xlsx import load_into  # noqa: E402
 
 from .models import DDERow
 
 
 # Fields the compliance-matrix DDERow understands. The shared loader
-# may yield additional keys (e.g. block_ref, keywords) — we just drop
-# any that DDERow doesn't accept rather than maintain two parallel
-# field lists.
+# may yield additional keys; load_into() filters to this whitelist
+# before constructing each DDERow so future DDE schema additions
+# don't break this consumer.
 _ALLOWED_FIELDS = {
     "stable_id",
     "text",
@@ -56,11 +55,10 @@ def load_dde_xlsx(path: str | Path, side: str = "contract") -> List[DDERow]:
     matrix this file represents.
     """
 
-    out: List[DDERow] = []
-    for record in iter_dde_records(path):
-        filtered = {k: v for k, v in record.items() if k in _ALLOWED_FIELDS}
-        out.append(DDERow(side=side, **filtered))
-    return out
+    def _factory(**kw):
+        return DDERow(side=side, **kw)
+
+    return load_into(path, _factory, fields=_ALLOWED_FIELDS)
 
 
 def load_pair(

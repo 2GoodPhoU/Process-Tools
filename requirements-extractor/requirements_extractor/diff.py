@@ -87,10 +87,17 @@ def _read_requirements_workbook(path: Path) -> List[Dict[str, str]]:
     tolerated and become empty strings.
     """
     wb = load_workbook(path, read_only=True, data_only=True)
-    # Prefer the named sheet so a user-saved workbook with a different
-    # active tab doesn't confuse the reader.
-    ws = wb["Requirements"] if "Requirements" in wb.sheetnames else wb.active
-    rows = list(ws.iter_rows(values_only=True))
+    try:
+        # Prefer the named sheet so a user-saved workbook with a different
+        # active tab doesn't confuse the reader.
+        ws = wb["Requirements"] if "Requirements" in wb.sheetnames else wb.active
+        rows = list(ws.iter_rows(values_only=True))
+    finally:
+        # Close so the OS releases the file handle. Windows refuses to
+        # delete files with open handles; without this, callers using
+        # tempfile.TemporaryDirectory hit PermissionError [WinError 32]
+        # on cleanup. (Linux tolerates the leak.)
+        wb.close()
     if not rows:
         return []
     headers = [str(c or "").strip() for c in rows[0]]

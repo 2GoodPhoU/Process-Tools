@@ -1,8 +1,17 @@
-"""Compatibility shim — the Markdown writer lives in :mod:`writers_extra`.
+"""DEPRECATED -- removed 2026-04-25.
 
-This module exists only so callers that imported ``md_writer`` in an
-earlier pass don't break.  New code should ``from .writers_extra
-import write_requirements_md`` directly.
+The compatibility shim that re-exported from ``writers_extra`` has
+been removed. New code should import directly:
+
+    from requirements_extractor.writers_extra import write_requirements_md
+
+This module raises on import to fail loudly rather than silently
+return stale exports. The file itself can be deleted; it stays here
+as a placeholder so a `git status` shows the removal explicitly.
 """
 
-from .writers_extra import write_requirements_md  # noqa: F401
+raise ImportError(
+    "requirements_extractor.md_writer was removed 2026-04-25. "
+    "Import from requirements_extractor.writers_extra instead "
+    "(write_requirements_md)."
+)

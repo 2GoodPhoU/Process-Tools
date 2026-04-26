@@ -6,6 +6,79 @@ versions follow [SemVer](https://semver.org/spec/v2.0.0.html). Pre-1.0
 behaviour: minor versions may include breaking CLI / config / output-shape
 changes — they will always be called out under a **Breaking** subhead.
 
+## [Unreleased]
+
+### Added — rule-based actor-extraction fallback
+- `requirements_extractor/actor_heuristics.py` (~460 lines). Ten
+  heuristics, each a pure `str -> List[str]` function with the example
+  sentence inline. Each rule is conservative — false positives are
+  worse than false negatives because reviewers audit the output xlsx
+  and noise costs them time.
+- Heuristic catalogue: `_h_by_agent`, `_h_send_to`, `_h_possessive`,
+  `_h_compound_subject`, `_h_conditional_subject`, `_h_for_beneficiary`,
+  `_h_implicit_passive`, `_h_hyphenated_role`, `_h_between`,
+  `_h_appositive`.
+- Role-shape probe (`_is_role_phrase`) gates every rule's output: head
+  noun in a curated role-noun list (Service, System, Manager, …) OR
+  agent-noun morpheme (-er/-or/-ist/-ant/-ent) with Title case OR a
+  2–6-letter all-caps acronym.
+- Wired into `ActorResolver` via opt-in `use_heuristics=True`
+  constructor flag. Order is regex → nlp → rule (highest-confidence
+  first; cross-source dedup).
+- Default off so existing test fixtures stay green; caller opts in.
+- 36 new tests in `tests/test_actor_heuristics.py` — per-rule positive
+  and negative tests (false-positive control is the real failure mode),
+  end-to-end through `extract_actor_candidates`, three integration
+  tests for `ActorResolver(use_heuristics=True)`.
+
+### Added — cross-tool integration test
+- `tests/integration/test_extractor_to_compliance_matrix.py` (243 lines)
+  exercises the DDE → compliance-matrix path end-to-end.
+- `docs/INTEGRATION.md` describes the integration contract.
+
+### Added — DDE → nimbus-skeleton integration test
+- `tests/integration/test_extractor_to_nimbus_skeleton.py` (6 tests)
+  mirrors the existing `test_extractor_to_compliance_matrix.py` for
+  the second downstream consumer. Verifies the five-default-output
+  shape, the six-output-with-`--bpmn` shape, manifest content,
+  review xlsx well-formedness, and BPMN XML well-formedness.
+
+### Removed (Breaking)
+- `requirements_extractor.json_writer` and `requirements_extractor.md_writer`
+  compatibility shims have been removed. Their canonical
+  implementations have lived in `requirements_extractor.writers_extra`
+  for some time; the shims existed only for backward import-path
+  compatibility. Importing either module now raises `ImportError`
+  with a pointer to the canonical name. **Migration:**
+  `from requirements_extractor.writers_extra import write_requirements_json,
+  write_requirements_md, requirement_to_dict`.
+
+  Eric confirmed (REFACTOR.md item T1, 2026-04-25) no external scripts
+  use the old import paths. The placeholder modules remain on disk
+  with `raise ImportError` bodies — they can be physically removed in
+  the same commit or a follow-up.
+
+### Fixed
+- `actors.load_actors_from_xlsx` and `diff._read_requirements_workbook`
+  now close the openpyxl workbook explicitly via try/finally. Linux
+  was tolerating the leaked handle (delete-on-last-close); Windows
+  raised `PermissionError [WinError 32]` whenever a caller used
+  `tempfile.TemporaryDirectory` to manage the input file, which
+  surfaced as 7 tests erroring on Windows but passing on Linux. No
+  behavioural change beyond releasing the file handle.
+
+### Test count
+- Total suite is now **511 tests** (469 from 0.5.0 + 36
+  actor-heuristics + 6 nimbus-integration). All 511 green on both
+  Linux and Windows after the handle-close fix.
+
+### Open follow-ups (not yet wired)
+- CLI flag `--actor-heuristics` (default off) — currently only
+  available via Python API.
+- GUI checkbox for the same.
+- Configurable role-noun whitelist (`_ROLE_HEAD_NOUNS`) once corpus
+  feedback shows whether the default list is too tight or too loose.
+
 ## [0.5.0] — 2026-04-24
 
 This release captures everything between the original 0.1.0 scaffold and

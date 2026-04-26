@@ -12,10 +12,10 @@ standard document, then feed both xlsx files into this tool.
 
 ## Status
 
-**Scaffold complete, end-to-end smoke test green.** The four matchers,
+**End-to-end pipeline green; 23 tests passing.** The five matchers,
 combiner, and three-sheet xlsx writer are all wired up. Tuning the
-similarity / keyword thresholds against real spec / procedure pairs is
-the obvious next step.
+similarity / keyword / fuzzy-id thresholds against real spec /
+procedure pairs is the obvious next step.
 
 ## How it works
 
@@ -27,15 +27,15 @@ the obvious next step.
    manual_mapping.yaml ─────────────────────┘   (optional)
 ```
 
-Four matchers run in parallel:
+Five matchers run in parallel:
 
 | Matcher           | Approach                              | Strengths                       | Weight |
 |-------------------|---------------------------------------|---------------------------------|--------|
 | `explicit_id`     | Regex on cited section / clause IDs   | Highest signal, lowest noise    | 1.00   |
 | `manual_mapping`  | Operator-curated yaml/csv lookup      | Gold standard, re-usable        | 1.00   |
 | `similarity`      | TF-IDF cosine on requirement/clause text | Catches paraphrased links     | 0.85   |
-| `fuzzy_id`        | Levenshtein distance on section refs  | Catches typos & format variations | 0.60   |
 | `keyword_overlap` | Token Jaccard on shared content words | Cheap baseline, transparent     | 0.65   |
+| `fuzzy_id`        | Levenshtein distance on section refs  | Catches typos & format variations | 0.50 (default fallback — see refactor list) |
 
 Per-matcher scores are weighted and the **maximum** is taken as the
 combined score. Every matcher's evidence is preserved on the output's
@@ -114,22 +114,26 @@ compliance-matrix --contract C.xlsx --procedure P.xlsx -o out.xlsx
 
 ```
 compliance-matrix/
+├── CHANGELOG.md
 ├── README.md
 ├── run_cli.py                          (CLI shortcut)
 ├── compliance_matrix/
 │   ├── __init__.py
 │   ├── models.py                       (DDERow, Match, CombinedMatch)
-│   ├── loader.py                       (DDE xlsx → DDERow)
+│   ├── loader.py                       (thin wrapper over process-tools-common)
 │   ├── combiner.py                     (matcher score fusion)
 │   ├── matrix_writer.py                (3-sheet xlsx output)
 │   ├── cli.py                          (argparse entry point)
 │   └── matchers/
-│       ├── explicit_id.py
-│       ├── keyword_overlap.py
+│       ├── __init__.py
+│       ├── explicit_id.py              (regex on cited IDs)
+│       ├── manual_mapping.py           (operator yaml/csv lookup)
+│       ├── fuzzy_id.py                 (pure-stdlib Levenshtein on IDs)
 │       ├── similarity.py               (pure-stdlib TF-IDF)
-│       └── manual_mapping.py
+│       └── keyword_overlap.py          (token Jaccard)
 └── tests/
-    └── test_smoke.py
+    ├── test_smoke.py                   (end-to-end pipeline)
+    └── test_fuzzy_id.py                (fuzzy-id matcher unit tests)
 ```
 
 ## Dependencies
@@ -137,6 +141,8 @@ compliance-matrix/
 - `openpyxl` — already pulled in by DDE.
 - `pyyaml` — only needed if you use a YAML manual mapping file. CSV
   format works without it.
+- `process-tools-common` — sibling package, wired in via a small
+  `sys.path` bootstrap in `loader.py`.
 
 ## Open questions for next iteration
 
@@ -144,12 +150,10 @@ compliance-matrix/
   haven't been validated against a real spec / procedure pair. Run on
   Eric's actual contract docs and see what level produces the right
   signal-to-noise.
-- **Fuzzy ID matching.** If a clause's stable ID appears in the
-  contract with a typo or a slight format difference (e.g. "DO-178C
-  Section 6.3.1" vs the procedure's bare "6.3.1"), the explicit_id
-  matcher can miss it. A `--explicit-id-fuzzy` mode using
-  `rapidfuzz.partial_ratio` would close that gap if the noise is
-  acceptable.
+- **Fuzzy-id weight.** The matcher ships using the combiner's 0.5
+  fallback weight rather than an explicit entry in `DEFAULT_WEIGHTS`.
+  Pick a deliberate weight once the matcher's behaviour is calibrated
+  against real data. Tracked in `Process-Tools/REFACTOR.md`.
 - **Coverage scoring.** The "X/Y requirements have at least one match"
   summary is binary — every match counts equally. A weighted version
   (a single keyword-overlap hit isn't really "coverage") might be

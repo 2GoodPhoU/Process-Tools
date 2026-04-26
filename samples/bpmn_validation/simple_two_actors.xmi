@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xmi:XMI xmi:version="2.5" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmlns:uml="http://www.omg.org/spec/UML/20131001">
+  <uml:Model xmi:id="model_1" name="Process Skeleton">
+    <packagedElement xmi:type="uml:Activity" xmi:id="act_1" name="Process Skeleton">
+      <node xmi:type="uml:InitialNode" xmi:id="node_initial" name="start"/>
+      <node xmi:type="uml:ActivityFinalNode" xmi:id="node_final" name="end"/>
+      <node xmi:type="uml:OpaqueAction" xmi:id="node_REQ-e9fab190" name="The Operator shall log in to the control console and confirm the previous…"/>
+      <node xmi:type="uml:OpaqueAction" xmi:id="node_REQ-7b0e308a" name="The Supervisor must review the overnight alarm log before releasing the…"/>
+      <node xmi:type="uml:OpaqueAction" xmi:id="node_REQ-ae91bf6c" name="The Operator shall verify that all subsystem status indicators read nominal"/>
+      <node xmi:type="uml:OpaqueAction" xmi:id="node_REQ-8af3bc67" name="The Supervisor must countersign the handover log once the checks are complete"/>
+      <edge xmi:type="uml:ControlFlow" xmi:id="flow_1" source="node_initial" target="node_REQ-e9fab190"/>
+      <edge xmi:type="uml:ControlFlow" xmi:id="flow_2" source="node_REQ-e9fab190" target="node_REQ-7b0e308a"/>
+      <edge xmi:type="uml:ControlFlow" xmi:id="flow_3" source="node_REQ-e9fab190" target="node_REQ-ae91bf6c"/>
+      <edge xmi:type="uml:ControlFlow" xmi:id="flow_4" source="node_REQ-7b0e308a" target="node_REQ-8af3bc67"/>
+      <edge xmi:type="uml:ControlFlow" xmi:id="flow_5" source="node_REQ-ae91bf6c" target="node_final"/>
+      <edge xmi:type="uml:ControlFlow" xmi:id="flow_6" source="node_REQ-8af3bc67" target="node_final"/>
+      <group xmi:type="uml:ActivityPartition" xmi:id="part_Operator" name="Operator">
+        <node xmi:idref="node_REQ-e9fab190"/>
+        <node xmi:idref="node_REQ-ae91bf6c"/>
+      </group>
+      <group xmi:type="uml:ActivityPartition" xmi:id="part_Supervisor" name="Supervisor">
+        <node xmi:idref="node_REQ-7b0e308a"/>
+        <node xmi:idref="node_REQ-8af3bc67"/>
+      </group>
+    </packagedElement>
+  </uml:Model>
+</xmi:XMI>

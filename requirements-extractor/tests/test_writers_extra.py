@@ -189,30 +189,27 @@ class TestMarkdownWriter(unittest.TestCase):
             self.assertIn("1 Negative", content)
 
 
-class TestCompatibilityShims(unittest.TestCase):
-    """The root-level ``json_writer`` and ``md_writer`` modules are
-    thin shims that re-export from ``writers_extra``.  They exist so
-    external scripts written during the earlier one-module-per-writer
-    era keep importing without a rewrite.  Pin the re-exports here
-    so a future refactor of ``writers_extra`` can't silently break
-    them.
+class TestRemovedShimsRaise(unittest.TestCase):
+    """Pin the ``json_writer`` / ``md_writer`` removal — importing
+    either module must raise ``ImportError`` (the placeholder modules
+    raise on load to prevent silent fallback to stale behaviour).
+
+    Removed 2026-04-25 per REFACTOR.md item T1. Eric confirmed no
+    external scripts use these names.
     """
 
-    def test_json_writer_shim_reexports(self) -> None:
-        from requirements_extractor import json_writer
-        from requirements_extractor.writers_extra import (
-            requirement_to_dict as canonical_to_dict,
-            write_requirements_json as canonical_write,
-        )
-        self.assertIs(json_writer.requirement_to_dict, canonical_to_dict)
-        self.assertIs(json_writer.write_requirements_json, canonical_write)
+    def test_json_writer_raises_on_import(self) -> None:
+        # Force fresh import so a previously-cached module doesn't mask the raise.
+        import importlib
+        with self.assertRaises(ImportError) as ctx:
+            importlib.import_module("requirements_extractor.json_writer")
+        self.assertIn("removed 2026-04-25", str(ctx.exception))
 
-    def test_md_writer_shim_reexports(self) -> None:
-        from requirements_extractor import md_writer
-        from requirements_extractor.writers_extra import (
-            write_requirements_md as canonical_write,
-        )
-        self.assertIs(md_writer.write_requirements_md, canonical_write)
+    def test_md_writer_raises_on_import(self) -> None:
+        import importlib
+        with self.assertRaises(ImportError) as ctx:
+            importlib.import_module("requirements_extractor.md_writer")
+        self.assertIn("removed 2026-04-25", str(ctx.exception))
 
 
 if __name__ == "__main__":

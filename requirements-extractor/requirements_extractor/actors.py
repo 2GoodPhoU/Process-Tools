@@ -307,8 +307,15 @@ def load_actors_from_xlsx(path: Path) -> List[ActorEntry]:
     from openpyxl import load_workbook
 
     wb = load_workbook(path, read_only=True, data_only=True)
-    ws = wb.active
-    rows = list(ws.iter_rows(values_only=True))
+    try:
+        ws = wb.active
+        rows = list(ws.iter_rows(values_only=True))
+    finally:
+        # Close so the OS releases the file handle. Windows refuses to
+        # delete files with open handles; without this, callers using
+        # tempfile.TemporaryDirectory hit PermissionError [WinError 32]
+        # on cleanup. (Linux tolerates the leak.)
+        wb.close()
     if not rows:
         return []
 
