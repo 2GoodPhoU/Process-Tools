@@ -1,0 +1,16 @@
+{
+  "_comment": "Static config. Do NOT register these tasks until Eva validation week clears (~2026-05-03). After that, ask Cowork to register via the scheduled-tasks MCP.",
+  "project_name": "Process-Tools",
+  "project_path": "C:\\Users\\erics\\Documents\\GitHub\\Process-Tools",
+  "tasks": [
+    {"name": "Process-Tools — Night Auditor", "schedule": "daily at 00:00", "role": "night-auditor", "prompt": "You are the Night Auditor for the project at C:\\Users\\erics\\Documents\\GitHub\\Process-Tools. Read CLAUDE.md, STATE.md, JOURNAL.md. Follow roles/night-auditor.md exactly. READ-ONLY."},
+    {"name": "Process-Tools — Researcher", "schedule": "daily at 04:00", "role": "researcher", "prompt": "You are the Researcher for the project at C:\\Users\\erics\\Documents\\GitHub\\Process-Tools. Read CLAUDE.md, STATE.md, NEEDS-INPUT.md, QUEUE.md. Follow roles/researcher.md exactly. Investigate ONE bounded question; write findings to research/."},
+    {"name": "Process-Tools — Planner", "schedule": "daily at 07:00", "role": "planner", "prompt": "You are the Planner for the project at C:\\Users\\erics\\Documents\\GitHub\\Process-Tools. Read CLAUDE.md, JOURNAL.md, NEEDS-INPUT.md, PROPOSED.md, QUEUE.md, DONE.md. Follow roles/planner.md exactly. Update STATE.md and curate QUEUE.md."},
+    {"name": "Process-Tools — Worker (8am)", "schedule": "daily at 08:00", "role": "worker", "prompt": "You are a Worker for the project at C:\\Users\\erics\\Documents\\GitHub\\Process-Tools. Read CLAUDE.md, STATE.md, JOURNAL.md (last 6h), QUEUE.md. Follow roles/worker.md exactly. Execute ONE item."},
+    {"name": "Process-Tools — Worker (9am)", "schedule": "daily at 09:00", "role": "worker", "prompt": "You are a Worker for the project at C:\\Users\\erics\\Documents\\GitHub\\Process-Tools. Read CLAUDE.md, STATE.md, JOURNAL.md (last 6h), QUEUE.md. Follow roles/worker.md exactly. Execute ONE item."},
+    {"name": "Process-Tools — Worker (10am)", "schedule": "daily at 10:00", "role": "worker", "prompt": "You are a Worker for the project at C:\\Users\\erics\\Documents\\GitHub\\Process-Tools. Read CLAUDE.md, STATE.md, JOURNAL.md (last 6h), QUEUE.md. Follow roles/worker.md exactly. Execute ONE item."},
+    {"name": "Process-Tools — Worker (11am)", "schedule": "daily at 11:00", "role": "worker", "prompt": "You are a Worker for the project at C:\\Users\\erics\\Documents\\GitHub\\Process-Tools. Read CLAUDE.md, STATE.md, JOURNAL.md (last 6h), QUEUE.md. Follow roles/worker.md exactly. Execute ONE item."},
+    {"name": "Process-Tools — Worker (12pm)", "schedule": "daily at 12:00", "role": "worker", "prompt": "You are a Worker for the project at C:\\Users\\erics\\Documents\\GitHub\\Process-Tools. Read CLAUDE.md, STATE.md, JOURNAL.md (last 6h), QUEUE.md. Follow roles/worker.md exactly. Execute ONE item."},
+    {"name": "Process-Tools — Digest", "schedule": "daily at 16:45", "role": "digest", "prompt": "You are the Digest for the project at C:\\Users\\erics\\Documents\\GitHub\\Process-Tools. Read CLAUDE.md, JOURNAL.md (since last digest), NEEDS-INPUT.md, PROPOSED.md, QUEUE.md, DONE.md. Follow roles/digest.md exactly. Write to digests/."}
+  ]
+}
