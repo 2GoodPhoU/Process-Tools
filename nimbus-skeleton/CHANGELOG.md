@@ -23,16 +23,25 @@ changes — they will always be called out under a **Breaking** subhead.
   `<bpmn:association>` for free-text notes.
 - Hand-built XML using `xml.sax.saxutils.escape` + `quoteattr`,
   mirroring the XMI emitter convention. Byte-stable across runs.
-- BPMNDI graphical layout intentionally omitted — modern BPMN tools
-  auto-layout on import; arbitrary pixel coordinates would just be
-  wrong.
+- BPMNDI (diagram interchange) graphical layout IS emitted — every
+  shape gets a `<bpmndi:BPMNShape>` with `<dc:Bounds>` and every
+  flow gets a `<bpmndi:BPMNEdge>` with `<di:waypoint>` entries.
+  Layout is a deterministic horizontal-swimlane grid (lanes
+  top-to-bottom in actor order; nodes left-to-right by longest-path
+  rank from start; cross-lane edges get a 4-waypoint elbow). The
+  earlier "modern modelers auto-layout on import" assumption was
+  wrong — bpmn.io and recent Camunda Modeler refuse to render a
+  DI-less file. See `DECISIONS.md` "BPMN DI generation" entry for
+  the corrected reasoning. Closes REFACTOR.md item S3.
 - Wired into `cli.py` as `--bpmn` flag (additive — existing emitters
   unchanged). Default off so the standard 5-file output stays
   unchanged unless explicitly requested.
-- 14 tests in `tests/test_bpmn_emitter.py`: structural round-trip
+- 21 tests in `tests/test_bpmn_emitter.py`: structural round-trip
   (parse-and-assert), byte-stability, ID safety (special-char actor
   names yield NCName-valid IDs), empty-skeleton case, CLI flag
-  wiring.
+  wiring, and a new `TestBpmnEmitterDiagramInterchange` class
+  covering shape count, edge count, integer-only bounds, ≥2
+  waypoints per edge, and bpmnElement ref resolution.
 
 ### Added — review-writer enhancement
 - `review_writer.py` now takes optional `dde_rows=None` and adds a
@@ -55,8 +64,9 @@ changes — they will always be called out under a **Breaking** subhead.
   `requirements-extractor/research/2026-04-25-stack-alternatives-survey.md`.
 
 ### Test count
-- Total suite is now **33 tests** (16 from prior 0.1.0 + 14 BPMN
-  + 3 review-writer enhancement).
+- Total suite is now **40 tests** (16 from prior 0.1.0 + 21 BPMN
+  + 3 review-writer enhancement). The BPMN suite grew from 14 to
+  21 with the addition of 7 DI-section assertions.
 
 ### Changed — CLI plumbing
 - `--quiet` flag and the quiet-aware logger are now centralised in

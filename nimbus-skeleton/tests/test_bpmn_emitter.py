@@ -226,6 +226,99 @@ class TestBpmnEmitterEmptySkeleton(unittest.TestCase):
         self.assertEqual(len(process.findall(_ns("endEvent"))), 1)
 
 
+_BPMNDI_NS = "http://www.omg.org/spec/BPMN/20100524/DI"
+_DC_NS = "http://www.omg.org/spec/DD/20100524/DC"
+_DI_NS = "http://www.omg.org/spec/DD/20100524/DI"
+
+
+def _di(tag: str) -> str:
+    return f"{{{_BPMNDI_NS}}}{tag}"
+
+
+def _dc(tag: str) -> str:
+    return f"{{{_DC_NS}}}{tag}"
+
+
+def _diNs(tag: str) -> str:
+    return f"{{{_DI_NS}}}{tag}"
+
+
+class TestBpmnEmitterDiagramInterchange(unittest.TestCase):
+    # The BPMNDiagram (DI) section is what makes bpmn.io / Camunda
+    # Modeler actually render the diagram instead of saying "no diagram
+    # to display." See DECISIONS.md "BPMN DI generation" entry.
+
+    def setUp(self) -> None:
+        self.skeleton = build_skeleton(_corpus())
+        self.xml = bpmn.render(self.skeleton, title="DI Smoke Test")
+        self.root = ET.fromstring(self.xml)
+        diagrams = self.root.findall(_di("BPMNDiagram"))
+        self.assertEqual(len(diagrams), 1)
+        self.diagram = diagrams[0]
+        planes = self.diagram.findall(_di("BPMNPlane"))
+        self.assertEqual(len(planes), 1)
+        self.plane = planes[0]
+
+    def test_plane_references_collaboration(self) -> None:
+        self.assertEqual(self.plane.get("bpmnElement"), "Collaboration_1")
+
+    def test_shape_count_matches_semantic_counts(self) -> None:
+        shapes = self.plane.findall(_di("BPMNShape"))
+        expected = (
+            1
+            + len(self.skeleton.actors)
+            + len(self.skeleton.activities)
+            + len(self.skeleton.gateways)
+            + 2
+            + len(self.skeleton.notes)
+        )
+        self.assertEqual(len(shapes), expected)
+
+    def test_every_shape_has_integer_bounds(self) -> None:
+        for shape in self.plane.findall(_di("BPMNShape")):
+            bounds = shape.find(_dc("Bounds"))
+            self.assertIsNotNone(bounds)
+            for attr in ("x", "y", "width", "height"):
+                v = bounds.get(attr)
+                self.assertIsNotNone(v)
+                int(v)  # raises if non-integer
+
+    def test_edge_count_matches_sequence_and_association_count(self) -> None:
+        edges = self.plane.findall(_di("BPMNEdge"))
+        process = self.root.find(_ns("process"))
+        assert process is not None
+        n_flows = len(process.findall(_ns("sequenceFlow")))
+        n_assocs = len(process.findall(_ns("association")))
+        self.assertEqual(len(edges), n_flows + n_assocs)
+
+    def test_every_edge_has_at_least_two_waypoints(self) -> None:
+        for edge in self.plane.findall(_di("BPMNEdge")):
+            wps = edge.findall(_diNs("waypoint"))
+            self.assertGreaterEqual(len(wps), 2)
+
+    def test_shape_and_edge_bpmnelement_refs_resolve(self) -> None:
+        defined = set()
+        for elem in self.root.iter():
+            eid = elem.get("id")
+            if eid:
+                defined.add(eid)
+        for shape in self.plane.findall(_di("BPMNShape")):
+            self.assertIn(shape.get("bpmnElement"), defined)
+        for edge in self.plane.findall(_di("BPMNEdge")):
+            self.assertIn(edge.get("bpmnElement"), defined)
+
+    def test_empty_skeleton_still_emits_diagram(self) -> None:
+        from nimbus_skeleton.models import Skeleton
+        xml = bpmn.render(Skeleton(), title="Empty")
+        root = ET.fromstring(xml)
+        diagrams = root.findall(_di("BPMNDiagram"))
+        self.assertEqual(len(diagrams), 1)
+        plane = diagrams[0].find(_di("BPMNPlane"))
+        assert plane is not None
+        shapes = plane.findall(_di("BPMNShape"))
+        self.assertGreaterEqual(len(shapes), 3)
+
+
 class TestBpmnEmitterCli(unittest.TestCase):
     """The --bpmn flag wires through the CLI without tripping anything."""
 

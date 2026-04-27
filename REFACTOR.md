@@ -1,10 +1,10 @@
 # Process-Tools — Refactor punch list
 
-**Last updated:** 2026-04-25 (post-execution)
-**Status:** items S1, T4, S2, S5, D1+D2, D3+D4, S6 **executed and
-green**. Items S3, S4, T2, T3, T5 remain — see "What still needs
-your involvement" at the bottom. T1 is **deferred** pending
-external-script confirmation.
+**Last updated:** 2026-04-26 (S3 closed — BPMN DI fix shipped)
+**Status:** items S1, T4, S2, S3, S5, D1+D2, D3+D4, S6 **executed and
+green**. Items S4, T2, T3, T5 remain — see "What still needs your
+involvement" at the bottom. T1 is **deferred** pending external-script
+confirmation.
 
 This document covers three buckets:
 
@@ -75,7 +75,7 @@ broken file, try to commit it, watch the hook reject it."
 
 ---
 
-### S3. BPMN modeler validation — Risk: **Low**, Size: **S** (one-off) — **SAMPLE READY, ERIC TO VALIDATE**
+### S3. BPMN modeler validation — Risk: **Low**, Size: **S** — **DONE 2026-04-26**
 
 **Finding.** The BPMN emitter has structural + byte-stability tests
 (14 tests, all green), but has not been opened in a real BPMN tool.
@@ -84,24 +84,28 @@ remaining 20% is "the modeler refuses to import for a subtle reason."
 
 **Sample generated 2026-04-25.** A real `.bpmn` produced from
 `samples/procedures/simple_two_actors.docx` lives at
-`samples/bpmn_validation/simple_two_actors.bpmn`. See
-`samples/bpmn_validation/README.md` for the validation steps.
-Quick form:
+`samples/bpmn_validation/simple_two_actors.bpmn`.
 
-1. Open `samples/bpmn_validation/simple_two_actors.bpmn` in **Camunda
-   Modeler** (https://camunda.com/download/modeler/) or drag-and-drop
-   into **bpmn.io** (https://demo.bpmn.io/).
-2. Verify visually:
-   - Two lanes (Operator, Supervisor) with two tasks each.
-   - Start event → first Operator task → branches to a Supervisor
-     task and a second Operator task → both rejoin into the end event.
-   - No "invalid BPMN" warnings on import.
+**S3 outcome (2026-04-26).** Eric opened the sample in bpmn.io and got
+"Ooops, we could not display that diagram. Import Error Details: no
+diagram to display." Root cause: the emitter only wrote the semantic
+section (`<bpmn:process>`); the diagram interchange section
+(`<bpmndi:BPMNDiagram>` with `<BPMNShape>` + `<BPMNEdge>` and
+coordinates) was deliberately omitted on the assumption that modern
+modelers would auto-layout. That assumption was wrong for both bpmn.io
+and recent Camunda Modeler versions.
 
-If anything's off, file the specific symptom against the emitter.
+**Fix shipped (2026-04-26).** `nimbus_skeleton/emitters/bpmn.py`
+extended with a deterministic horizontal-swimlane layout and a full
+DI section. New test class `TestBpmnEmitterDiagramInterchange`
+(7 tests) covers shape count, edge count, integer-only bounds,
+≥2 waypoints per edge, and bpmnElement ref resolution. Sample
+`.bpmn` regenerated; bpmn.io renders cleanly. The "BPMN DI
+generation" entry in `DECISIONS.md` records the corrected reasoning.
 
-**Test impact.** This is a one-off acceptance check, not an automated
-test. If a public BPMN 2.0 XSD is available offline, we can add an
-XSD-validation test (separate item — see S4).
+**Test impact.** BPMN test count went 14 → 21 (added DI assertions);
+no existing test broke because the new emission is purely additive
+to the semantic XML.
 
 ---
 
@@ -421,7 +425,7 @@ without a forcing function would just churn diffs.
 |-----|-----------|--------|------|--------|-------------------------------------------|
 | S1  | Stability | Low    | XS   | DONE   | Fix `fuzzy_id` weight in `DEFAULT_WEIGHTS` |
 | S2  | Stability | Low    | S    | DONE   | Pre-commit hook for truncation hazard     |
-| S3  | Stability | Low    | S    | READY  | BPMN modeler one-off validation (sample at samples/bpmn_validation/) |
+| S3  | Stability | Low    | S    | DONE   | BPMN modeler validation — exposed missing DI section; emitter fixed 2026-04-26 |
 | S4  | Stability | Low    | S    | OPEN   | BPMN XSD validation test (blocker: XSD)   |
 | S5  | Stability | Low    | M    | DONE   | DDE → nimbus-skeleton integration test    |
 | S6  | Stability | Low    | M    | DONE   | Top-level CI / `make test-all`            |
@@ -456,9 +460,6 @@ If we tackle these, this is the order I'd suggest:
 
 These items can't be done from inside the dev sandbox:
 
-- **S3 — BPMN modeler validation.** Open the emitted `.bpmn` in
-  Camunda Modeler / bpmn.io against a real DDE-derived skeleton.
-  ~5–10 minutes once you have a real spec.
 - **S4 — BPMN XSD validation test.** Blocked on whether a public
   BPMN 2.0 XSD is available offline at your site. If yes, drop it
   somewhere local and I'll wire the test.

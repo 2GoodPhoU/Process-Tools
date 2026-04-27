@@ -24,10 +24,23 @@ Model produced is a single ``bpmn:process`` containing:
 - ``bpmn:startEvent`` and ``bpmn:endEvent`` bracketing the flow
 - ``bpmn:sequenceFlow`` edges between nodes
 
-Diagram-interchange (BPMNDI) graphical layout is intentionally NOT
-emitted. Modern BPMN tools (Camunda Modeler, bpmn.io) auto-layout on
-import, and shipping a hand-rolled DI section means picking pixel
-coordinates that no tool would agree with anyway.
+Diagram-interchange (BPMNDI) graphical layout IS emitted — every shape
+gets a ``bpmndi:BPMNShape`` with ``dc:Bounds`` and every flow gets a
+``bpmndi:BPMNEdge`` with ``di:waypoint`` entries. The reference renderer
+bpmn.io refuses to display a BPMN file that lacks a ``BPMNDiagram``
+("no diagram to display"); recent Camunda Modeler versions behave the
+same way. The earlier assumption that modern tools auto-layout DI-less
+BPMN was disproven during S3 modeler validation on 2026-04-26 — see
+``DECISIONS.md`` "BPMN DI generation" entry.
+
+Layout is a deterministic horizontal-swimlane grid: pool wraps lanes
+top-to-bottom in actor-insertion order, nodes within a lane spread
+left-to-right by longest-path rank from the start event. Coordinates
+are pixel integers so the output is byte-identical across runs (a
+property the byte-stability test pins). The numbers won't match any
+modeler's preferred layout — every modeler users open it in will
+re-tidy on first save — but the diagram renders cleanly out of the box
+and conveys the right shape on first import.
 
 The XML is hand-built rather than via ``xml.etree.ElementTree`` to match
 the XMI emitter's style and keep output byte-stable across runs (ET's
@@ -49,6 +62,28 @@ _BPMNDI_NS = "http://www.omg.org/spec/BPMN/20100524/DI"
 _DC_NS = "http://www.omg.org/spec/DD/20100524/DC"
 _DI_NS = "http://www.omg.org/spec/DD/20100524/DI"
 _XSI_NS = "http://www.w3.org/2001/XMLSchema-instance"
+
+
+# Layout constants — pixels, integers (so the rendered XML is byte-stable
+# and not vulnerable to floating-point format differences across Python
+# versions). Numbers chosen for legible default rendering in bpmn.io and
+# Camunda Modeler; nothing magic about them.
+_POOL_X = 100               # pool top-left
+_POOL_Y = 50
+_PARTICIPANT_LABEL_W = 30   # left strip inside the pool reserved for the rotated participant name
+_LANE_LABEL_W = 30          # left strip inside each lane reserved for the rotated lane name
+_LANE_HEIGHT = 200
+_LEFT_GUTTER = 40           # space inside the lane area before the first node column
+_RIGHT_GUTTER = 60          # space after the last node column before the pool right edge
+_COLUMN_WIDTH = 140         # per-rank horizontal slot (TASK_WIDTH 100 + gap 40)
+_TASK_WIDTH = 100
+_TASK_HEIGHT = 80
+_EVENT_SIZE = 36            # start / end events are squares (rendered as circles)
+_GATEWAY_SIZE = 50          # gateways are squares (rendered as diamonds)
+_NOTE_WIDTH = 200
+_NOTE_HEIGHT = 60
+_NOTE_GAP_BELOW_POOL = 50
+_NOTE_GAP_X = 40
 
 
 def render(skeleton: Skeleton, title: str = "Process Skeleton") -> str:
@@ -227,22 +262,20 @@ def render(skeleton: Skeleton, title: str = "Process Skeleton") -> str:
     # Mirrors the XMI emitter's strategy: anchor every note to the first
     # activity in builder-emission order (or omit association if there
     # are no activities, in which case the note still appears in-canvas).
-    first_activity_bid: str | None = (
+    first_activity_bid = (
         bpmn_ids[skeleton.activities[0].stable_id] if skeleton.activities else None
     )
     assoc_counter = 0
+    associations = []  # (assoc_id, src_bid, tgt_bid) — re-used for DI
     for note in skeleton.notes:
         ann_id = bpmn_ids[note.stable_id]
-        parts.append(
-            f'    <bpmn:textAnnotation id={quoteattr(ann_id)}>'
-        )
-        parts.append(
-            f'      <bpmn:text>{xml_escape(note.text)}</bpmn:text>'
-        )
+        parts.append(f'    <bpmn:textAnnotation id={quoteattr(ann_id)}>')
+        parts.append(f'      <bpmn:text>{xml_escape(note.text)}</bpmn:text>')
         parts.append('    </bpmn:textAnnotation>')
         if first_activity_bid is not None:
             assoc_counter += 1
             assoc_id = f"Association_{assoc_counter}"
+            associations.append((assoc_id, first_activity_bid, ann_id))
             parts.append(
                 f'    <bpmn:association id={quoteattr(assoc_id)} '
                 f'sourceRef={quoteattr(first_activity_bid)} '
@@ -250,22 +283,222 @@ def render(skeleton: Skeleton, title: str = "Process Skeleton") -> str:
             )
 
     parts.append('  </bpmn:process>')
+
+    # BPMN Diagram Interchange (DI) — every shape gets a BPMNShape with
+    # dc:Bounds and every flow gets a BPMNEdge with di:waypoints. Without
+    # this section bpmn.io and recent Camunda Modeler refuse to render.
+    shapes, edges, pool, lanes_di = _compute_layout(
+        skeleton=skeleton,
+        bpmn_ids=bpmn_ids,
+        sequence_flows=sequence_flows,
+        associations=associations,
+        start_id=start_id,
+        end_id=end_id,
+    )
+    parts.append('  <bpmndi:BPMNDiagram id="BPMNDiagram_1">')
+    parts.append(
+        f'    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement={quoteattr(collab_id)}>'
+    )
+    px, py, pw, ph = pool
+    parts.append(
+        f'      <bpmndi:BPMNShape id="Participant_1_di" '
+        f'bpmnElement="Participant_1" isHorizontal="true">'
+    )
+    parts.append(
+        f'        <dc:Bounds x="{px}" y="{py}" width="{pw}" height="{ph}"/>'
+    )
+    parts.append('      </bpmndi:BPMNShape>')
+    for lane_bid, (lx, ly, lw, lh) in lanes_di.items():
+        parts.append(
+            f'      <bpmndi:BPMNShape id={quoteattr(lane_bid + "_di")} '
+            f'bpmnElement={quoteattr(lane_bid)} isHorizontal="true">'
+        )
+        parts.append(
+            f'        <dc:Bounds x="{lx}" y="{ly}" width="{lw}" height="{lh}"/>'
+        )
+        parts.append('      </bpmndi:BPMNShape>')
+    di_shape_order = [start_id]
+    for activity in skeleton.activities:
+        di_shape_order.append(bpmn_ids[activity.stable_id])
+    for gateway in skeleton.gateways:
+        di_shape_order.append(bpmn_ids[gateway.stable_id])
+    di_shape_order.append(end_id)
+    for note in skeleton.notes:
+        di_shape_order.append(bpmn_ids[note.stable_id])
+    for bid in di_shape_order:
+        if bid not in shapes:
+            continue
+        x, y, w, h = shapes[bid]
+        parts.append(
+            f'      <bpmndi:BPMNShape id={quoteattr(bid + "_di")} '
+            f'bpmnElement={quoteattr(bid)}>'
+        )
+        parts.append(
+            f'        <dc:Bounds x="{x}" y="{y}" width="{w}" height="{h}"/>'
+        )
+        parts.append('      </bpmndi:BPMNShape>')
+    for flow_id, _src, _tgt in sequence_flows:
+        wp = edges.get(flow_id, [])
+        if not wp:
+            continue
+        parts.append(
+            f'      <bpmndi:BPMNEdge id={quoteattr(flow_id + "_di")} '
+            f'bpmnElement={quoteattr(flow_id)}>'
+        )
+        for x, y in wp:
+            parts.append(f'        <di:waypoint x="{x}" y="{y}"/>')
+        parts.append('      </bpmndi:BPMNEdge>')
+    for assoc_id, _src, _tgt in associations:
+        wp = edges.get(assoc_id, [])
+        if not wp:
+            continue
+        parts.append(
+            f'      <bpmndi:BPMNEdge id={quoteattr(assoc_id + "_di")} '
+            f'bpmnElement={quoteattr(assoc_id)}>'
+        )
+        for x, y in wp:
+            parts.append(f'        <di:waypoint x="{x}" y="{y}"/>')
+        parts.append('      </bpmndi:BPMNEdge>')
+    parts.append('    </bpmndi:BPMNPlane>')
+    parts.append('  </bpmndi:BPMNDiagram>')
+
     parts.append('</bpmn:definitions>')
     parts.append("")
     return "\n".join(parts)
 
 
-def write(skeleton: Skeleton, output_path, title: str = "Process Skeleton") -> None:
+def write(skeleton, output_path, title="Process Skeleton"):
     Path(output_path).write_text(render(skeleton, title=title), encoding="utf-8")
 
 
-def _safe_id(stable_id: str) -> str:
-    """BPMN ids must be xsd:ID-valid (an NCName): start with a letter or
-    underscore, then [A-Za-z0-9-_.] only. ``REQ-AB12`` is valid;
-    ``actor name with spaces`` is not — replace bad chars with
-    underscores. Empty input yields ``anon`` so we never emit an empty
-    id (which would be a hard schema-validation failure)."""
+def _compute_ranks(node_ids, flows, start_id):
+    """Longest-path rank from start_id to each node — X-axis column index."""
+    rank = {nid: 0 for nid in node_ids}
+    rank[start_id] = 0
+    for _ in range(len(node_ids) + 1):
+        changed = False
+        for _flow_id, src, tgt in flows:
+            new_rank = rank.get(src, 0) + 1
+            if new_rank > rank.get(tgt, 0):
+                rank[tgt] = new_rank
+                changed = True
+        if not changed:
+            break
+    return rank
 
+
+def _compute_layout(skeleton, bpmn_ids, sequence_flows, associations, start_id, end_id):
+    """Compute pixel-integer positions for every shape and waypoint.
+
+    Returns (shapes, edges, pool, lanes). Layout is a horizontal-swimlane
+    grid: lanes top-to-bottom in actor order; nodes within a lane spread
+    left-to-right by longest-path rank from start; events at vertical
+    centre of pool; notes in a strip below the pool; cross-lane edges as
+    4-waypoint elbows; same-lane edges as 2-waypoint straight lines.
+    """
+    lane_ids = {}
+    for i, actor in enumerate(skeleton.actors, 1):
+        lane_ids[actor] = f"Lane_{i}_" + _safe_id(actor)
+
+    node_to_actor = {}
+    for activity in skeleton.activities:
+        node_to_actor[bpmn_ids[activity.stable_id]] = activity.actor
+    for gateway in skeleton.gateways:
+        node_to_actor[bpmn_ids[gateway.stable_id]] = gateway.actor
+
+    flow_node_ids = [start_id, end_id, *node_to_actor.keys()]
+    rank = _compute_ranks(flow_node_ids, sequence_flows, start_id)
+    max_rank = max([rank.get(nid, 0) for nid in flow_node_ids] + [0])
+    rank[end_id] = max(max_rank, rank.get(end_id, 0))
+    max_rank = rank[end_id]
+
+    num_lanes = max(len(skeleton.actors), 1)
+    pool_x = _POOL_X
+    pool_y = _POOL_Y
+    pool_inner_x_start = pool_x + _PARTICIPANT_LABEL_W + _LANE_LABEL_W + _LEFT_GUTTER
+    pool_width = (
+        _PARTICIPANT_LABEL_W + _LANE_LABEL_W + _LEFT_GUTTER
+        + (max_rank + 1) * _COLUMN_WIDTH
+        + _RIGHT_GUTTER
+    )
+    pool_height = num_lanes * _LANE_HEIGHT
+
+    lanes = {}
+    for i, actor in enumerate(skeleton.actors):
+        lane_x = pool_x + _PARTICIPANT_LABEL_W
+        lane_y = pool_y + i * _LANE_HEIGHT
+        lane_w = pool_width - _PARTICIPANT_LABEL_W
+        lane_h = _LANE_HEIGHT
+        lanes[lane_ids[actor]] = (lane_x, lane_y, lane_w, lane_h)
+
+    shapes = {}
+
+    def x_for_rank(r):
+        return pool_inner_x_start + r * _COLUMN_WIDTH
+
+    def y_in_lane(actor, node_height):
+        if actor not in lane_ids:
+            return pool_y + (pool_height - node_height) // 2
+        _lx, ly, _lw, lh = lanes[lane_ids[actor]]
+        return ly + (lh - node_height) // 2
+
+    shapes[start_id] = (
+        x_for_rank(rank[start_id]),
+        pool_y + (pool_height - _EVENT_SIZE) // 2,
+        _EVENT_SIZE, _EVENT_SIZE,
+    )
+    shapes[end_id] = (
+        x_for_rank(rank[end_id]),
+        pool_y + (pool_height - _EVENT_SIZE) // 2,
+        _EVENT_SIZE, _EVENT_SIZE,
+    )
+    for activity in skeleton.activities:
+        bid = bpmn_ids[activity.stable_id]
+        shapes[bid] = (
+            x_for_rank(rank[bid]),
+            y_in_lane(activity.actor, _TASK_HEIGHT),
+            _TASK_WIDTH, _TASK_HEIGHT,
+        )
+    for gateway in skeleton.gateways:
+        bid = bpmn_ids[gateway.stable_id]
+        shapes[bid] = (
+            x_for_rank(rank[bid]) + (_TASK_WIDTH - _GATEWAY_SIZE) // 2,
+            y_in_lane(gateway.actor, _GATEWAY_SIZE),
+            _GATEWAY_SIZE, _GATEWAY_SIZE,
+        )
+    note_y = pool_y + pool_height + _NOTE_GAP_BELOW_POOL
+    for i, note in enumerate(skeleton.notes):
+        bid = bpmn_ids[note.stable_id]
+        shapes[bid] = (
+            pool_x + i * (_NOTE_WIDTH + _NOTE_GAP_X),
+            note_y,
+            _NOTE_WIDTH, _NOTE_HEIGHT,
+        )
+
+    edges = {}
+
+    def _waypoints(src_bid, tgt_bid):
+        if src_bid not in shapes or tgt_bid not in shapes:
+            return []
+        sx0, sy0, sw, sh = shapes[src_bid]
+        tx0, ty0, tw, th = shapes[tgt_bid]
+        sx, sy = sx0 + sw, sy0 + sh // 2
+        tx, ty = tx0, ty0 + th // 2
+        if sy == ty:
+            return [(sx, sy), (tx, ty)]
+        mid_x = (sx + tx) // 2
+        return [(sx, sy), (mid_x, sy), (mid_x, ty), (tx, ty)]
+
+    for flow_id, src_bid, tgt_bid in sequence_flows:
+        edges[flow_id] = _waypoints(src_bid, tgt_bid)
+    for assoc_id, src_bid, tgt_bid in associations:
+        edges[assoc_id] = _waypoints(src_bid, tgt_bid)
+
+    return shapes, edges, (pool_x, pool_y, pool_width, pool_height), lanes
+
+
+def _safe_id(stable_id):
+    """BPMN ids must be xsd:ID-valid (NCName). Replace bad chars with _."""
     if not stable_id:
         return "anon"
     safe = []
