@@ -8,6 +8,8 @@ changes — they will always be called out under a **Breaking** subhead.
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-04-26
+
 ### Added — rule-based actor-extraction fallback
 - `requirements_extractor/actor_heuristics.py` (~460 lines). Ten
   heuristics, each a pure `str -> List[str]` function with the example
@@ -219,5 +221,6 @@ hardware / software that the dev sandbox doesn't have. Baseline:
 - Sentence splitter, dry-run mode, basic actors auto-detection.
 - Persistent GUI settings.
 
+[0.6.0]: #060--2026-04-26
 [0.5.0]: #050--2026-04-24
 [0.1.0]: #010--initial-scaffold
