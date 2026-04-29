@@ -145,6 +145,7 @@ class Requirement:
     polarity: str = "Positive"          # "Positive" | "Negative" (shall-not etc.)
     stable_id: str = ""                 # "REQ-<8hex>" - survives upstream content churn
     context: str = ""                   # surrounding source text for reviewer context (REVIEW §3.8); empty when redundant with `text`
+    parent_id: str = ""                 # 0.6.2: when this row is a multi-action sub-requirement, this is the parent's stable_id (e.g. "REQ-abc12345" for child "REQ-abc12345.1"); "" otherwise
 
     @property
     def secondary_actors_str(self) -> str:
