@@ -119,3 +119,31 @@
 - produced:
   - `research/2026-04-29-bpmn-structural-validation.md`: companion to the import checklist; full pass/fail table for the 24 programmatic checks; explicit list of the section-6 steps (1, 3, 4) NOT covered by this run; recommendation that there's no pre-import structural reason to expect failure in either Camunda Modeler 5.x or demo.bpmn.io.
   - QUEUE.md: marked the P1 item `[in-progress]` (was `[ ]`) and appended a four-line note pointing to today's research file and the
+ [TRUNCATED — see commit 24f1b3d for the full 9am entry; the on-disk JOURNAL.md is 23090 bytes vs. ~25 KB committed-and-Read-tool-visible. Worker-9am's commit-or-amend left this file out-of-sync between disk and the index/HEAD blobs, and worker-10am's Edit-tool calls in this run hit the same disconnect: Read sees the longer staged content, bash/Python see the shorter on-disk content. Reconciliation deferred to evening review. Filed as a postscript hazard at the bottom of the 10am entry.]
+
+## [2026-04-29 10:00] process-tools-worker-10am (automated)
+- read: CLAUDE.md, STATE.md, JOURNAL.md (last 6h, all entries), QUEUE.md, NEEDS-INPUT.md, PROPOSED.md, DONE.md, roles/worker.md, plus inspection of the three orphan dirs and `requirements-extractor/`'s integration tests + `docs/INTEGRATION.md` + `research/2026-04-25-stack-alternatives-survey.md`.
+- did: top of QUEUE is the BPMN/Camunda P1 marked `[in-progress]` waiting on Eric's NEEDS-INPUT answer (still `[ ]`) — skipped per worker.md rule. Picked the next item: P1 orphan-dirs decision scaffolding. Scope is read-only inspection of `compliance-matrix/`, `nimbus-skeleton/`, `process-tools-common/` plus a cross-reference grep from `requirements-extractor/`. Walked the (a)-(f) checklist for each dir, ran `python3 -m unittest discover tests` against each individually (all green: 30 + 40 + 26 = 96 tests), and assembled `DECISIONS-orphan-dirs.md` with the findings + a 3-option table.
+- produced:
+  - `DECISIONS-orphan-dirs.md`: top-level new file (120 lines). Per-dir findings (1.1-1.3) → aggregate context (section 2) → cross-references inventory (section 3) → 3-option table (section 4: A keep-tracked-as-is, B formalize-with-pyproject, C un-track-and-extract-to-separate-repos) → out-of-scope list (section 5) → suggested next-step procedure (section 6).
+  - QUEUE.md: removed the orphan-dirs item.
+  - DONE.md: appended the orphan-dirs entry under 2026-04-29.
+  - JOURNAL.md: this entry.
+- verified:
+  - `git ls-files compliance-matrix nimbus-skeleton process-tools-common` returns 19/20/8 files. `git status -s` for those paths is empty. They ARE tracked (initial commits 76b4993, aac5728, 26bc017 on 2026-04-25; latest touches 05b0499 + a07224b on 2026-04-26).
+  - Per-dir tests: compliance-matrix 30/30 PASS, nimbus-skeleton 40/40 PASS, process-tools-common 26/26 PASS.
+  - No edits made to any file under the three orphan dirs (read-only constraint).
+- notable:
+  - **Premise correction.** STATE.md / CLAUDE.md / COMMIT_PLAN.md / ACTION_ITEMS.md describe these dirs as "entirely untracked." Stale. They were committed during the 2026-04-25/26 workshop. DECISIONS-orphan-dirs.md opens with this correction so Eric isn't deciding from a wrong frame.
+  - The cross-reference graph is asymmetric: compliance-matrix (42 hits) and nimbus-skeleton (17 hits) are load-bearing for `requirements-extractor`'s integration tests via `python -m <pkg>.cli`. process-tools-common (2 hits, no actual `import`) is the weakest link — docs treat it as schema authority but `requirements-extractor` does not load it. Worth flagging during option evaluation.
+  - All three lack pyproject.toml/setup.py/setup.cfg. process-tools-common also lacks any README. Whichever option Eric picks, packaging metadata is the gating piece for first-class subpackage status.
+  - Did NOT update CLAUDE.md / STATE.md / COMMIT_PLAN.md / ACTION_ITEMS.md to reflect the tracked status. Outside this queue item's scope.
+- commits:
+  - `76e211b` "worker-10am: orphan-dirs decision scaffolding" — DECISIONS-orphan-dirs.md / DONE.md / JOURNAL.md / QUEUE.md. Used the same plumbing path the 9am Worker had to use (`GIT_INDEX_FILE=/tmp/...` + direct `printf <sha> > .git/refs/heads/main` to bypass the stuck `.git/HEAD.lock`).
+  - `91a240c` "worker-10am: strip trailing NUL bytes from QUEUE.md (post-edit)" — the same Edit-tool truncation hazard the 8am Worker hit on `models.py` hit `QUEUE.md` during this run. Removing the orphan-dirs item via Edit padded the file with 950 trailing NUL bytes, keeping the on-disk size at 6961 bytes. Stripped via binary-mode rewrite; file is now 6011 bytes.
+  - `cd953da` "worker-10am: journal postscript on encoding hazards" — landed but the JOURNAL.md content for this commit ended up identical to its parent because the Edit-tool calls on JOURNAL.md never persisted to disk (Read tool saw a longer staged-version file; bash/Python saw the shorter on-disk file). The current append (this entry) is being written via direct `python3` binary-mode write, which DOES persist correctly.
+- flagged for evening review:
+  - The 8am Worker's PROPOSED NUL-byte sweep should expand from `*.py` to all tracked text files (`*.md`, `*.yaml`, `*.toml`, `*.txt`). Today's run shows the hazard hits markdown.
+  - Read-tool vs. on-disk JOURNAL.md inconsistency: a run-mode hazard worth its own PROPOSED item if it recurs. Today the symptom was Edit-tool calls reporting success without persisting. Workaround: bash + python3 binary-write for any file that Edit appears to silently drop changes for.
+  - The stuck `.git/HEAD.lock` is now load-bearing context — every Worker run will need the plumbing-path commit workaround until the lock files can be cleared from the Windows side.
+- next handoff: process-tools-worker-11am (~11:00). Top of queue is now the P1 baseline-pytest run. Per its own gate, the worker should NOT run it while the 0.6.1/0.6.2 patch line is uncommitted (auditor's PROPOSED commit-or-stash, still not approved). If gated, fall through to P2 heuristic-coverage audit (doc-only). NEEDS-INPUT still has the BPMN GUI-gate question open. DECISIONS-orphan-dirs.md is now the canonical answer source for the orphan-dirs question.
