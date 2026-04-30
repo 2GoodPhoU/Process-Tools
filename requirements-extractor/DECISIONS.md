@@ -65,3 +65,68 @@ These are *what a future remediation would do*, not *what this audit does* — D
 - Resolve the dead `elif` in `_h_appositive` — either delete or convert to an explicit early-return for clarity.
 
 Whether to act on these is Eric's call. The audit's purpose is to make the gaps visible, not to close them.
+
+---
+
+## 2026-04-30 -- PyInstaller spec audit (DocumentDataExtractor.spec)
+
+**Context.** The spec at `requirements-extractor/packaging/DocumentDataExtractor.spec` defines the air-gapped binary build via PyInstaller. Shipped target has no network access, so a missing `collect_all` entry surfaces as a runtime `ImportError` on the offline network -- not at build time. Last spec-touching commit was `b33be38` ("Extract procedural-table subsystem into procedural.py"); the spec-as-policy-edit commit before it was `2243dfb` ("PyInstaller spec: cover new modules + bundle PDF/dnd extras"). Three modules have entered `requirements_extractor/` since: `actor_heuristics.py` (committed `cfc8ef7`, "Rule-based actor-extraction fallback"), plus `compound.py` and `multi_action.py` (still untracked working-tree files belonging to the 0.6.1/0.6.2 patch line per the night-auditor's PROPOSED commit-or-stash entry).
+
+**Method.** Walked all 25 `.py` files under `requirements_extractor/` plus the entry point `run_gui.py`. Used `ast` to extract every top-level `import X` and absolute `from X import ...` (level == 0; relative imports skipped as internal). Bucketed top-level package names against `sys.stdlib_module_names`, the package's own `requirements_extractor.*` namespace, and the spec's `_bundle()` calls plus tuple-iterated bundle entries. Cross-referenced the explicit internal `hiddenimports` list against the on-disk module set. Stdlib-only audit script; no spec edits.
+
+**State at audit.** `bash scripts/test_all.sh` ALL GREEN, 702/702 across 4 tools. Spec file on disk matches HEAD byte-for-byte. `actor_heuristics.py` is in HEAD (`git ls-tree HEAD`); `compound.py` and `multi_action.py` are untracked (`git status -s` shows `??`).
+
+### Findings
+
+#### A) Third-party imports in shipped-binary code paths but NOT in spec `_bundle` list -- 1 entry
+
+| Top-level package | Used in | Severity |
+|---|---|---|
+| `yaml` (PyYAML) | `requirements_extractor/config.py:391`, `requirements_extractor/keywords_loader.py:100` | HIGH |
+
+`yaml` is imported lazily inside `_load_yaml_overrides` (config.py) and the YAML branch of the keywords loader (keywords_loader.py), each wrapped in a `try/except ImportError` that falls back to a `"Install with: pip install pyyaml"` user-facing error. On the air-gapped target there is no `pip install`, so the soft message is a hard wall: any user shipping a `*.reqx.yaml` config or a `*.yaml` keywords file gets a runtime failure that looks like a configuration problem but is actually a missing bundle. The repo-root `requirements.txt` and `BASELINE-2026-04-29.md` both list `PyYAML 6.0.3` as a runtime dependency. The spec calls neither `_bundle("yaml")` nor `_bundle("PyYAML")` and lists no PyYAML hidden import. PyInstaller's static analysis MAY pick up the lazy `import yaml` lines via the importedmodule graph, but `collect_all` is the harness this spec uses to drag in package data files (CResolver/CDumper extension binaries, configuration assets); without it those auxiliary files are unreliable across PyInstaller versions and host environments.
+
+#### B) Spec `_bundle` entries NOT directly imported in shipped-binary code -- 24 entries
+
+All 24 are intentional. Grouped by reason:
+
+- **spaCy core transitives** (loaded via spaCy's `catalogue` registry, not by source-level import): `thinc`, `srsly`, `cymem`, `preshed`, `murmurhash`, `blis`, `catalogue`, `wasabi`, `spacy_legacy`, `spacy_loggers`, `confection`.
+- **spaCy model + language data**: `en_core_web_sm` (loaded via `spacy.load("en_core_web_sm")` -- string identifier, not Python import), `langcodes`, `language_data`, `marisa_trie`.
+- **spaCy CLI / asset-management deps** (used by spaCy itself): `weasel`, `cloudpathlib`, `smart_open`.
+- **spaCy v3.7+ schema deps**: `pydantic`, `pydantic_core`, `annotated_types`.
+- **CLI dispatch transitives**: `typer`, `click`.
+- **pdfplumber backend**: `pdfminer` (pdfplumber depends on it; the spec bundles it independently as belt-and-braces).
+
+The spec's own comments at lines 41-43 ("Optional NLP stack -- bundled so 'Use NLP' works out of the box") and lines 73-75 ("best-effort treatment as the NLP stack ... bundled when installed in the build venv, silently skipped when absent so a CLI-only build isn't forced to drag them in") are the operative policy. **No proposal -- keep all 24.**
+
+#### C) Internal `requirements_extractor.*` modules NOT in explicit `hiddenimports` -- 3 entries
+
+| Module | Tracked? | Import path in code | Verdict |
+|---|---|---|---|
+| `requirements_extractor.actor_heuristics` | YES (commit `cfc8ef7`) | Lazy import inside `actors.py:252` -- `from .actor_heuristics import extract_actor_candidates` | **gap, shipping now** |
+| `requirements_extractor.compound` | NO (untracked) | Top-level static import in `parser.py:271` -- `from . import compound as _compound` | gap, pre-emptive |
+| `requirements_extractor.multi_action` | NO (untracked) | Top-level static import in `parser.py:275` -- `from . import multi_action as _multi_action` | gap, pre-emptive |
+
+The spec's stated policy on this list (`DocumentDataExtractor.spec` lines 95-96): "Keep this list in sync with `requirements_extractor/*.py`. Listing them explicitly is belt-and-braces over PyInstaller's static analysis -- a few are imported via dynamic dispatch which static analysis sometimes misses." `actor_heuristics` is exactly the dynamic-dispatch pattern the comment flags -- a deferred `from .X import Y` inside a method body. PyInstaller MAY pick it up via the relative-import graph; the explicit list exists because MAY is not the bar. `compound` and `multi_action` are top-level static imports and would normally be caught, but spec policy says list them anyway. They cannot ship until the 0.6.1/0.6.2 patch line is committed (auditor's PROPOSED P1, unapproved).
+
+#### D) Spec `excludes` -- 13 entries, all confirmed unused
+
+`matplotlib`, `scipy`, `numpy.distutils`, `PIL.ImageTk`, `PyQt5`, `PyQt6`, `PySide2`, `PySide6`, `IPython`, `jupyter`, `notebook`, `pytest`, `sphinx`. None appear as top-level imports in any shipped-binary code path. Excludes are consistent with the code; no action.
+
+### Findings summary
+
+1. **One shipping-now gap: `yaml` is missing from the spec.** Any YAML config or YAML keywords file on the air-gapped target fails with the project's own "Install with: pip install pyyaml" message. Severity HIGH for any user shipping `*.reqx.yaml` or `*.yaml`.
+2. **One shipping-now gap: `requirements_extractor.actor_heuristics` is missing from the explicit internal hiddenimports.** Reached only through a lazy-inside-function import -- the exact dynamic-dispatch pattern the spec author flagged.
+3. **Two pre-emptive gaps: `compound`, `multi_action`.** Won't ship until the 0.6.1/0.6.2 patch line is committed (auditor's PROPOSED P1, unapproved). Whoever lands that commit must also amend the spec.
+4. **Twenty-four `_bundle` entries that look like dead weight are not.** They are spaCy + pdfplumber transitive deps whose `catalogue`/registry-based loading defeats PyInstaller's static analysis. Do not propose removal.
+5. **`excludes` list is healthy.** Thirteen entries; all confirmed absent from shipped-binary code paths.
+
+### Recommendations (not actions)
+
+DoD: "Do NOT edit the spec -- propose changes via PROPOSED.md if any are warranted." A PROPOSED.md entry filed in the same run captures these for the evening review.
+
+- Add `"yaml"` to the optional add-ons tuple at lines 76-81 (alongside `pdfplumber`, `pdfminer`, `tkinterdnd2`). One line; the existing best-effort treatment is correct (silently skipped if PyYAML isn't installed in the build venv).
+- Add `"requirements_extractor.actor_heuristics"` to the explicit internal hiddenimports list at lines 96-119. One line.
+- Bundle the `compound` and `multi_action` additions into whatever commit lands the 0.6.1/0.6.2 patch line -- both modules need to enter the explicit hiddenimports list at the same time the source files become tracked. Two lines; gated on a separate decision.
+
+The audit script and the per-finding cross-reference are in this entry; a future re-audit reproduces by re-running the same `ast`-based walk and re-comparing against the spec's `_bundle()` and `hiddenimports` extracted via `re`. No new tooling needed.
