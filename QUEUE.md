@@ -1,4 +1,4 @@
-# Queue — Process-Tools
+# Queue -- Process-Tools
 
 > Prioritized work waiting to be picked up by Workers. The Planner curates this each morning. Workers pick the top unchecked item.
 
@@ -7,7 +7,7 @@
 Each item:
 
 ```
-- [ ] [P0|P1|P2] Title — one-sentence description.
+- [ ] [P0|P1|P2] Title -- one-sentence description.
   - Definition of done: ...
   - Notes: ...
 ```
@@ -18,14 +18,10 @@ Use `[in-progress]` instead of `[ ]` if a Worker started but couldn't finish (wi
 
 - [in-progress] [P1] Validate the new BPMN 2.0 emitter output against Camunda Modeler's import.
   - Definition of done: emit a representative skeleton via the BPMN emitter, import into Camunda Modeler (free desktop), confirm structural integrity (lanes, tasks, gateways, sequence flows, text annotations) round-trips cleanly. Document any failures as DECISIONS doc entries.
-  - Constraint: READ-ONLY against `nimbus-skeleton/`. Orphan-dirs tracked-vs-ignored decision is unresolved (see CLAUDE.md off-limits). Do NOT edit source under `nimbus-skeleton/`, `compliance-matrix/`, or `process-tools-common/`. Emit BPMN artifacts to your run's scratch dir; record findings in `nimbus-skeleton/DECISIONS.md` (file may be created — that's a doc, not source). If the emitter run requires a code change to produce a clean import, stop and write to NEEDS-INPUT.md.
-  - Notes: Closes the Nimbus → BPMN 2.0 migration-path validation gate. **Read `research/2026-04-29-camunda-import-checklist.md` first** — it has the per-element pass-criterion table (section 2), the round-trip-as-structural-identity rule (section 3), the list of Camunda 5.x lint warnings that are NOT failures (section 4: platform-tag noise, executionPlatform missing, Zeebe runtime hints), and a 6-step Worker procedure (section 6). Use those, don't redo the research.
-  - **Worker-9am 2026-04-29:** programmatic structural validation done (24/24 PASS) and section-5 unittest pins re-run green (40/40 in nimbus-skeleton). The remaining ~20% is the GUI gate (Camunda Modeler desktop + demo.bpmn.io drag-drop + save round-trip), which an unattended Worker cannot exercise. See `research/2026-04-29-bpmn-structural-validation.md` for the partial-validation report, and the NEEDS-INPUT entry below for the two paths Eric can pick from to unblock the GUI step.
-
-- [ ] [P2] Edit-tool truncation sweep — broadened to all four core requirements_extractor modules.
-  - Definition of done: run `git diff HEAD --` against `requirements-extractor/requirements_extractor/cli.py`, `actors.py`, `models.py`, and `extractor.py` (or whichever four modules are core — confirm by file size + import graph). Compare line counts and `tail -15` against the last commit. If all are clean (no uncommitted truncation), append a one-line note to JOURNAL.md confirming clean state. If truncation is detected on any module, write to NEEDS-INPUT.md with file, expected vs. actual line count, and stop — do NOT attempt to restore.
-  - Notes: CLAUDE.md flags edit-tool truncation as a recurring hazard for cli.py and actors.py specifically. Tonight's audit revealed the hazard hit a third file (models.py) — broadening the sweep to the four core modules costs nothing extra and would have caught tonight's P0 a day earlier. Not gated on the P0 (read-only inspection). After the P0 is fixed, the sweep should pass cleanly.
+  - Constraint: READ-ONLY against `nimbus-skeleton/`. Orphan-dirs tracked-vs-ignored decision is unresolved (see CLAUDE.md off-limits). Do NOT edit source under `nimbus-skeleton/`, `compliance-matrix/`, or `process-tools-common/`. Emit BPMN artifacts to your run's scratch dir; record findings in `nimbus-skeleton/DECISIONS.md` (file may be created -- that's a doc, not source). If the emitter run requires a code change to produce a clean import, stop and write to NEEDS-INPUT.md.
+  - Notes: Closes the Nimbus -> BPMN 2.0 migration-path validation gate. **Read `research/2026-04-29-camunda-import-checklist.md` first** -- it has the per-element pass-criterion table (section 2), the round-trip-as-structural-identity rule (section 3), the list of Camunda 5.x lint warnings that are NOT failures (section 4: platform-tag noise, executionPlatform missing, Zeebe runtime hints), and a 6-step Worker procedure (section 6). Use those, don't redo the research.
+  - **Worker-9am 2026-04-29:** programmatic structural validation done (24/24 PASS) and section-5 unittest pins re-run green (40/40 in nimbus-skeleton). The remaining ~20% is the GUI gate (Camunda Modeler desktop + demo.bpmn.io drag-drop + save round-trip), which an unattended Worker cannot exercise. See `research/2026-04-29-bpmn-structural-validation.md` for the partial-validation report, and the NEEDS-INPUT entry for the three paths Eric can pick from to unblock the GUI step. **Workers: skip this item until Eric answers the NEEDS-INPUT.**
 
 - [ ] [P2] Audit the PyInstaller spec against current imports.
-  - Definition of done: compare actual imports in `requirements-extractor/` shipped-binary code paths against the PyInstaller spec's `collect_all` / `hiddenimports` lists. Append findings as a section in `requirements-extractor/DECISIONS.md`: list of imports present in code but missing from the spec, list of entries in the spec that are no longer imported anywhere. Do NOT edit the spec — propose changes via PROPOSED.md if any are warranted.
+  - Definition of done: compare actual imports in `requirements-extractor/` shipped-binary code paths against the PyInstaller spec's `collect_all` / `hiddenimports` lists. Append findings as a section in `requirements-extractor/DECISIONS.md`: list of imports present in code but missing from the spec, list of entries in the spec that are no longer imported anywhere. Do NOT edit the spec -- propose changes via PROPOSED.md if any are warranted.
   - Notes: Air-gapped target. A missing `collect_all` entry shows up as a runtime import error on the offline network, not at build time.
