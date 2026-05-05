@@ -11,6 +11,7 @@ env/
 # PyInstaller build / dist artefacts
 build/
 dist/
+build.log
 *.manifest
 *.spec.bak
 
@@ -40,4 +41,4 @@ Thumbs.db
 /requirements_statement_set.csv
 *.reqif
 # (Note: the above are root-level only. Fixture outputs under
-# samples/ are explicitly committed.)
+# samples/ are explicitly co
