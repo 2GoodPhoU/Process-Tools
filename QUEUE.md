@@ -25,10 +25,8 @@ Use `[in-progress]` instead of `[ ]` if a Worker started but couldn't finish (wi
 
 ## Decomposed (next-pull-ready)
 
-These five items have no open Eric gate and can be picked up by the next unattended Worker. Pull from this list before scanning the phase sections below.
+These two items have no open Eric gate and can be picked up by the next unattended Worker. Pull from this list before scanning the phase sections below.
 
-- 3.3 -- Refresh CLAUDE.md test counts (`~508 / 33 / 13` -> actual `606 / 40 / 26 / 30`); add the missing `compliance-matrix` count. Closes the long-standing PROPOSED night-auditor 2026-04-29 P2.
-- 3.4 -- Update CLAUDE.md harness wording from `pytest (~N tests)` to `unittest discover (...)`. Bundle into 3.3's commit.
 - 4.5 -- Draft `RELEASE-NOTES-1.0.md` scaffold at repo root (sub-tool sections empty; customer-facing tone). No content commitments yet -- the scaffold gives Phase 4 a target file.
 - 5.4 -- Draft DECISIONS.md CUSTOMER_HANDOFF retrospective entry stub (date placeholder, sub-tool versions placeholder, retrospective bullet stubs). Same logic: scaffold ahead of Phase 5 so the entry is ready to fill on tag day.
 
@@ -70,25 +68,13 @@ These five items have no open Eric gate and can be picked up by the next unatten
 
 ## Decomposed (Phase 3 -- hardening + commit hygiene)
 
-> In progress. Several items have PROPOSED siblings awaiting Eric `[x]`; cross-referenced below. Only 3.3, 3.4 are next-pull-ready (no Eric gate) -- the remainder need an approval first. (3.1 closed by worker-8am 2026-05-05; see DONE.md.)
+> In progress. Several items have PROPOSED siblings awaiting Eric `[x]`; cross-referenced below. Phase-3 next-pull-ready items now exhausted (3.1 closed worker-8am 2026-05-05; 3.3 + 3.4 closed worker-9am 2026-05-05; see DONE.md). Remaining Phase-3 items all need an Eric gate first.
 
 - [ ] [P2] [phase-3] [code-touching] 3.2 -- Patch `requirements-extractor/packaging/DocumentDataExtractor.spec` per worker-10am 2026-04-30 audit.
   - DoD: spec gains `yaml` in `_bundle()` + `requirements_extractor.actor_heuristics` in explicit hiddenimports; once 0.6.1/0.6.2 patch line lands, also adds `requirements_extractor.compound` + `requirements_extractor.multi_action`; `pyinstaller packaging/DocumentDataExtractor.spec --clean --noconfirm` rebuild succeeds; offline smoke-test (YAML config + `use_heuristics=True`) loads in resulting binary.
   - Effort: medium (~2h; build verification is the slow part).
   - Deps: PROPOSED worker-10am 2026-04-30 (P2) `[x]`-approval; companion deps on PROPOSED auditor 2026-04-29 commit-or-stash for the compound/multi_action lines.
   - Skill: `engineering:code-review` (spec-edit + bundle-shape verification).
-
-- [ ] [P2] [phase-3] [doc-only] 3.3 -- Refresh CLAUDE.md test-count claims (`~508 / 33 / 13` -> actual `606 / 40 / 26 / 30`).
-  - DoD: CLAUDE.md "Stack & conventions" line carries `unittest discover (606 in requirements-extractor + 40 in nimbus-skeleton + 30 in compliance-matrix + 26 in process-tools-common = 702 total)`; numbers sourced from a `bash scripts/test_all.sh` run this shift.
-  - Effort: trivial (~10 min).
-  - Deps: none. Next-pull-ready. Closes PROPOSED night-auditor 2026-04-29 (P2); compatible with PROPOSED cowork-session 2026-05-04 numeric-facts auto-update if that lands first.
-  - Skill: `engineering:code-review`.
-
-- [ ] [P2] [phase-3] [doc-only] 3.4 -- Update CLAUDE.md harness wording: `pytest (~N tests)` -> `unittest discover (...)` to match `scripts/test_all.sh`.
-  - DoD: CLAUDE.md "Stack & conventions" no longer says "pytest" where the harness is unittest.
-  - Effort: trivial (~5 min). Bundle into 3.3's commit.
-  - Deps: none. Next-pull-ready.
-  - Skill: `engineering:code-review`.
 
 - [ ] [P1] [phase-3] [code-touching] 3.5 -- Implement the post-edit verification step in `roles/worker.md` + `roles/planner.md`.
   - DoD: `roles/worker.md` step 5 (and `roles/planner.md` step 2) carries the four-check sequence (`wc -c`, `tail -c 80`, `python3 -m py_compile` for .py files, `diff <(cat) <(git show HEAD:)` for content-equiv edits); one JOURNAL entry post-rollout shows a Worker actually following it.

@@ -8,7 +8,7 @@ Defense-contract Nimbus process modeling toolkit. Sub-tools: requirements-extrac
 
 ## Stack & conventions
 
-Python 3.x, PyInstaller offline-bundle (with `collect_all` for spacy + en_core_web_sm). spaCy NLP for actor extraction with rule-based heuristic fallback (10 conservative rules) for offline use. Tkinter GUI. pytest (~508 tests in requirements-extractor + 33 in nimbus-skeleton + 13 in process-tools-common).
+Python 3.x, PyInstaller offline-bundle (with `collect_all` for spacy + en_core_web_sm). spaCy NLP for actor extraction with rule-based heuristic fallback (10 conservative rules) for offline use. Tkinter GUI. unittest discover (606 in requirements-extractor + 40 in nimbus-skeleton + 30 in compliance-matrix + 26 in process-tools-common = 702 total).
 
 ## Off-limits
 
