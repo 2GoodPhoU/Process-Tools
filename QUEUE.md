@@ -39,12 +39,6 @@ These two items have no open Eric gate and can be picked up by the next unattend
   - Deps: 3.7 orphan-dir resolution (touches `nimbus-skeleton/`); originated as PROPOSED researcher 2026-04-29 (P2).
   - Skill: `engineering:system-design` (interchange-format design judgment) -> `engineering:code-review`.
 
-- [ ] [P2] [phase-2] [doc-only] 2.2 -- Fold the Camunda import checklist into `samples/bpmn_validation/README.md`.
-  - DoD: README's current 3-bullet "Verify visually" section replaced with the section-2 pass-criterion table + section-6 procedure inline; `research/2026-04-29-camunda-import-checklist.md` retained as provenance; README <= 2 pages.
-  - Effort: small (~30 min).
-  - Deps: confirm on pull whether `samples/bpmn_validation/` falls under the orphan-dir off-limits rule (path is at root, not under `nimbus-skeleton/`); originated as PROPOSED researcher 2026-04-29 (P2).
-  - Skill: `engineering:code-review` (doc-review).
-
 - [ ] [P1] [phase-2] [code-touching] 2.3 -- Capture the Camunda-saved BPMN as a regression fixture and add a structural-diff pin test against the original emitter output.
   - DoD: `nimbus-skeleton/tests/fixtures/simple_two_actors.camunda-saved.bpmn` checked in (post-2.5 capture); `tests/test_bpmn_camunda_roundtrip.py` adds 1-2 tests asserting structural-diff (via 2.1's helper) is empty between emitter output and Camunda-resave; suite +1-2 / 40+ green.
   - Effort: small (~1h, mostly fixture capture).
