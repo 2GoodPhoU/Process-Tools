@@ -168,9 +168,3 @@ These two items have no open Eric gate and can be picked up by the next unattend
   - Effort: small (~45 min). Picks up "Open follow-ups" already documented in each CHANGELOG.
   - Deps: 4.7.
   - Skill: `engineering:code-review`.
-
-- [ ] [P2] [phase-5] [doc-only] 5.4 -- Draft DECISIONS.md CUSTOMER_HANDOFF retrospective entry.
-  - DoD: one new entry in `DECISIONS.md` (root), decision-doc voice per CLAUDE.md, sections for what shipped + what slipped + what surprised + what to do differently for 1.1; cross-referenced to RELEASE-NOTES-1.0.md and the four CHANGELOGs.
-  - Effort: small (~1h; the scaffold is next-pull-ready, content fills on tag day).
-  - Deps: scaffold has none (next-pull-ready); content fill depends on 5.2.
-  - Skill: `engineering:code-review`.

@@ -85,3 +85,80 @@ be the right framing — this is the 20%.
 - `samples/bpmn_validation/simple_two_actors.bpmn` — regenerated.
 - `nimbus-skeleton/CHANGELOG.md` — Unreleased entry updated.
 - `REFACTOR.md` — S3 marked DONE.
+
+---
+
+## 2026-05-05 — 1.0 customer-handoff retrospective (scaffold)
+
+**Decision.** Pre-stage the 1.0 customer-handoff retrospective entry as
+a scaffold ahead of handoff day. Section headers, voice, and
+cross-references commit now; section bodies fill in on handoff day per
+QUEUE 5.2. This locks the structural shape so handoff day is content
+fill, not framing decisions.
+
+**Why now.** QUEUE 5.4 is next-pull-ready independent of every other
+1.0-cycle phase exit (DoD: "scaffold has none; content fill depends on
+5.2"). Highest-density pre-handoff doc task: one shift, doc-only, no
+source touched, no tests affected. Closes the last next-pull-ready item
+in today's chain.
+
+**What this entry will record on handoff day.** Four sections, voice as
+established for this file:
+
+- *What shipped.* The customer-facing capability set in 1.0 across the
+  four sub-tools. Sourced from each sub-tool's `[1.0.0]` CHANGELOG
+  section (created during 4.1-4.4) and from `RELEASE-NOTES-1.0.md`
+  once filled.
+- *What slipped.* Items on the 1.0 candidate list that got cut, with
+  the reason and the deferred destination. Sourced from `ROADMAP.md`
+  Post-1.0 / 1.1 section (seeded during 5.3) and from QUEUE/PROPOSED
+  items deferred past tag day.
+- *What surprised.* What 1.0 taught us that the 0.x roadmap did not
+  anticipate. Anchored to specific JOURNAL evidence from the 1.0 push,
+  not retroactive narrative.
+- *What to do differently for 1.1.* Concrete process changes carried
+  forward. Sourced from any retrospective findings the customer
+  surfaces during 5.2 handoff intake plus deferred PROPOSED items.
+
+**Cross-references.**
+
+- `RELEASE-NOTES-1.0.md` (root) — customer-facing release notes,
+  scaffolded by QUEUE 4.5 (worker-10am 2026-05-05).
+- `requirements-extractor/CHANGELOG.md` — `[1.0.0]` section per
+  QUEUE 4.1.
+- `nimbus-skeleton/CHANGELOG.md` — `[1.0.0]` section per QUEUE 4.2.
+- `compliance-matrix/CHANGELOG.md` — `[1.0.0]` section per QUEUE 4.3.
+- `process-tools-common/CHANGELOG.md` — `[1.0.0]` section per
+  QUEUE 4.4.
+- `ROADMAP.md` (root) — Post-1.0 / 1.1 section seeded during
+  QUEUE 5.3.
+- Bundle tag `1.0.0` — four sub-tools at the same HEAD per QUEUE 4.7.
+
+**What would change the call.** If the customer intake process for 5.2
+requires a structurally different retrospective (specific template,
+different audience, different cross-reference set), reshape the
+scaffold during 5.2 prep and append a fresh dated entry referencing
+this one rather than editing in place per the file preamble.
+
+**Files.**
+
+- `DECISIONS.md` (root, this entry).
+- `RELEASE-NOTES-1.0.md` (root, cross-referenced).
+- Four sub-tool `CHANGELOG.md` files (cross-referenced; content fills
+  during QUEUE 4.1-4.4).
+
+### What shipped
+
+_Filled in on handoff day per QUEUE 5.2._
+
+### What slipped
+
+_Filled in on handoff day per QUEUE 5.2._
+
+### What surprised
+
+_Filled in on handoff day per QUEUE 5.2._
+
+### What to do differently for 1.1
+
+_Filled in on handoff day per QUEUE 5.2._
