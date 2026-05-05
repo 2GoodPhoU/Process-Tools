@@ -70,7 +70,7 @@ These five items have no open Eric gate and can be picked up by the next unatten
 
 ## Decomposed (Phase 3 -- hardening + commit hygiene)
 
-> In progress. Several items have PROPOSED siblings awaiting Eric `[x]`; cross-referenced below. Only 3.1, 3.3, 3.4 are next-pull-ready (no Eric gate) -- the remainder need an approval first.
+> In progress. Several items have PROPOSED siblings awaiting Eric `[x]`; cross-referenced below. Only 3.3, 3.4 are next-pull-ready (no Eric gate) -- the remainder need an approval first. (3.1 closed by worker-8am 2026-05-05; see DONE.md.)
 
 - [ ] [P2] [phase-3] [code-touching] 3.2 -- Patch `requirements-extractor/packaging/DocumentDataExtractor.spec` per worker-10am 2026-04-30 audit.
   - DoD: spec gains `yaml` in `_bundle()` + `requirements_extractor.actor_heuristics` in explicit hiddenimports; once 0.6.1/0.6.2 patch line lands, also adds `requirements_extractor.compound` + `requirements_extractor.multi_action`; `pyinstaller packaging/DocumentDataExtractor.spec --clean --noconfirm` rebuild succeeds; offline smoke-test (YAML config + `use_heuristics=True`) loads in resulting binary.
@@ -191,4 +191,3 @@ These five items have no open Eric gate and can be picked up by the next unatten
   - Effort: small (~1h; the scaffold is next-pull-ready, content fills on tag day).
   - Deps: scaffold has none (next-pull-ready); content fill depends on 5.2.
   - Skill: `engineering:code-review`.
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          
