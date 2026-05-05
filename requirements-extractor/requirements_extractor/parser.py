@@ -265,6 +265,172 @@ from .procedural import (  # noqa: E402, F401 — re-exports for backward compat
     _split_candidate_actors,
 )
 
+# Compound-requirement detection (0.6.1).  Imported lazily-friendly: the
+# module has no heavy imports of its own so this is cheap.  See
+# :mod:`requirements_extractor.compound` for what the pre-pass does.
+from . import compound as _compound
+# Multi-action requirement decomposition (0.6.2).  Pure-helper module;
+# no heavy imports of its own.  See
+# :mod:`requirements_extractor.multi_action` for what the post-pass does.
+from . import multi_action as _multi_action
+from ._logging import logger as _logger
+
+
+def _apply_multi_action(
+    req: Requirement,
+    ctx: _ParseContext,
+    force_requirement: bool,
+) -> List[Requirement]:
+    """Apply 0.6.2 multi-action decomposition to a freshly emitted Requirement.
+
+    Returns either ``[req]`` (no decomposition) or, in ``split`` mode,
+    ``[req, sub1, sub2, ...]`` where ``req`` carries the original source
+    text as a record and each sub-requirement is one atomic obligation
+    derived from one verb phrase of the parent.
+
+    Modes:
+
+    * ``single`` - returns ``[req]`` unchanged.  Equivalent to 0.6.1.
+    * ``flag``   - returns ``[req]`` with a one-line note appended to
+      ``req.notes`` describing the multi-action count and a "consider
+      splitting" recommendation.  No new rows; reviewers decide
+      per-requirement.
+    * ``split``  - emits the parent (with a "split into N atomic
+      sub-requirements" note) plus N child rows.  Each child carries
+      the parent's stable_id in :attr:`Requirement.parent_id` and a
+      hierarchical sub-ID of the form ``<parent_id>.<n>`` (1-based).
+      Children inherit actor / heading_trail / source_file / row_ref;
+      block_ref is annotated with ``(multi-action sub N/M)``.
+
+    Defensive design:
+      * Wrapped in try/except so any failure logs and falls through to
+        ``[req]``.  One pathological sentence never aborts the parse.
+      * Gated off when ``force_requirement=True`` (procedural required-
+        action tables).  Those rows are atomic by virtue of the
+        ``Required Action`` column header semantics; splitting them
+        would fragment what is already atomic.
+      * When the multi-action config is missing (legacy callers passing
+        a Config dataclass built before 0.6.2), the function is a no-op.
+    """
+    if req is None:
+        return []
+    cfg = getattr(ctx.config, "multi_action", None)
+    if cfg is None or not getattr(cfg, "enabled", False):
+        return [req]
+    mode = getattr(cfg, "mode", "single")
+    if mode == "single":
+        return [req]
+    if force_requirement:
+        # Procedural required-action gate - mirrors the 0.6.1 compound
+        # gate.  See PATCH-0.6.2-NOTES.md for rationale.
+        return [req]
+    try:
+        det = _multi_action.detect(
+            req.text,
+            min_actions=getattr(cfg, "min_actions", 2),
+        )
+    except Exception:  # noqa: BLE001 - defensive: never abort the walk
+        _logger.warning(
+            "multi-action detect failed for stable_id=%s; "
+            "falling back to single-mode behaviour.",
+            req.stable_id,
+            exc_info=True,
+        )
+        return [req]
+
+    if not det.is_multi_action:
+        return [req]
+
+    if mode == "flag":
+        try:
+            note = _multi_action.render_flag_note(det)
+        except Exception:  # noqa: BLE001 - defensive
+            return [req]
+        if req.notes:
+            req.notes = req.notes + "\n" + note
+        else:
+            req.notes = note
+        return [req]
+
+    if mode == "split":
+        try:
+            return _build_split_subrequirements(req, det, ctx)
+        except Exception:  # noqa: BLE001 - defensive
+            _logger.warning(
+                "multi-action split failed for stable_id=%s; "
+                "falling back to single-mode behaviour.",
+                req.stable_id,
+                exc_info=True,
+            )
+            return [req]
+
+    # Unknown mode - fall through conservatively.
+    return [req]
+
+
+def _build_split_subrequirements(
+    parent: Requirement,
+    det: "_multi_action.MultiActionDetection",
+    ctx: _ParseContext,
+) -> List[Requirement]:
+    """Construct the parent + N atomic sub-requirements for ``split`` mode.
+
+    The parent row keeps its original text but gains a note pointing at
+    the children.  Each child row carries a synthetic sentence
+    ``<actor> <modal> <verb-phrase>.``, reuses the parent's
+    actor/heading/source-file context, and gets a hierarchical sub-ID
+    of the form ``<parent_stable_id>.<n>``.
+
+    Why include the parent: source faithfulness.  Reviewers should
+    always be able to find the original sentence as it was written by
+    the author.  Children carry the atomic semantics; the parent
+    carries the source link.  ReqIF maps this cleanly to the
+    "decomposition" relation - see PATCH-0.6.2-NOTES.md for export
+    notes.
+    """
+    n = det.count
+    # Annotate parent with a pointer at the children.
+    parent_note = (
+        f"Multi-action split: source sentence decomposed into "
+        f"{n} atomic sub-requirements ({parent.stable_id}.1 ... "
+        f"{parent.stable_id}.{n})."
+    )
+    if parent.notes:
+        parent.notes = parent.notes + "\n" + parent_note
+    else:
+        parent.notes = parent_note
+
+    out: List[Requirement] = [parent]
+    for i, action in enumerate(det.actions, start=1):
+        sub_text = _multi_action.render_sub_requirement(det, action)
+        sub_block_ref = f"{parent.block_ref} (multi-action sub {i}/{n})"
+        sub_stable_id = f"{parent.stable_id}.{i}"
+        sub_note = (
+            f"Atomic sub-requirement {i} of {n} (split from "
+            f"{parent.stable_id})."
+        )
+        sub = Requirement(
+            order=ctx.next_order(),
+            source_file=parent.source_file,
+            heading_trail=parent.heading_trail,
+            section_topic=parent.section_topic,
+            row_ref=parent.row_ref,
+            block_ref=sub_block_ref,
+            primary_actor=parent.primary_actor,
+            secondary_actors=list(parent.secondary_actors),
+            text=sub_text,
+            req_type=parent.req_type,
+            keywords=list(parent.keywords),
+            confidence=parent.confidence,
+            notes=sub_note,
+            polarity=parent.polarity,
+            stable_id=sub_stable_id,
+            context=parent.context,
+            parent_id=parent.stable_id,
+        )
+        out.append(sub)
+    return out
+
 
 #: Re-exported for the force-requirement path so a future confidence
 #: upgrade in :mod:`detector` lands in every code path automatically.
@@ -422,6 +588,18 @@ def _walk_content(
     the primary actor for the emitted requirement.  Sentences that don't
     name any candidate fall back to ``primary_actor`` (typically the
     joined cell text).
+
+    Compound-requirement pre-pass (0.6.1)
+    -------------------------------------
+    When ``ctx.config.compound.enabled`` is True (the default), this
+    function first runs :func:`compound.detect_groups` over the
+    paragraph children to identify "modal+colon lead-in followed by a
+    list of conditions" patterns.  Detected groups are emitted as a
+    single aggregated requirement (lead-in + items joined by their
+    inferred ``and`` / ``or`` / ``unless`` connector); the legacy
+    per-paragraph walk skips the claimed indices.  The pre-pass is
+    wrapped in try/except — any failure logs a warning and falls back
+    to the legacy behaviour for the whole parent.
     """
     if recursive is None:
         recursive = ctx.config.parser.recursive
@@ -433,7 +611,89 @@ def _walk_content(
     def _push_ref(tail: str) -> str:
         return f"{ref_prefix} > {tail}" if ref_prefix else tail
 
-    for block in iter_block_items(parent):
+    # Materialise the children into a list so the compound pre-pass can
+    # peek ahead without exhausting the iterator the legacy walk consumes.
+    blocks = list(iter_block_items(parent))
+
+    # ----- Compound-requirement pre-pass --------------------------------
+    #
+    # Build a parallel ``_BlockInfo`` list for the paragraph children, run
+    # ``compound.detect_groups``, and stash the result in two lookup
+    # structures:
+    #   * lead_in_at[idx] -> CompoundGroup   (paragraph IS a lead-in)
+    #   * claimed_items   -> set of indices  (paragraph IS a list item
+    #                                          claimed by some group)
+    #
+    # The legacy per-block walk then consults both before emitting; a
+    # claimed item is silently skipped, a lead-in emits the aggregated
+    # requirement instead of the bare lead-in sentence.
+    #
+    # Wrapped in try/except so any failure here (malformed input, an
+    # exception inside the compound module, etc.) logs a warning and
+    # leaves the legacy behaviour in place for THIS parent.  One bad
+    # parent never aborts the run.
+    lead_in_at = {}
+    claimed_items = set()
+    compound_enabled = bool(getattr(ctx.config, "compound", None) and ctx.config.compound.enabled)
+    # Procedural required-action tables (force_requirement=True) already
+    # treat every row as an atomic binding requirement by virtue of the
+    # column header.  Aggregating their lead-in + bullets into a single
+    # compound would *drop* atomic requirements rather than capture
+    # additional ones — exactly the opposite of what the patch is for.
+    # Compound detection is therefore disabled inside force-requirement
+    # walks; reviewers still get one row per bullet there, matching the
+    # 0.6.0 behaviour the procedural fixture suite pins.  Pure-prose
+    # paths (the case the patch was authored for) continue to aggregate.
+    # This is the autonomous design call flagged in PATCH-0.6.1-NOTES.md
+    # for Eric's morning review.
+    if force_requirement:
+        compound_enabled = False
+    if compound_enabled:
+        try:
+            block_infos = []
+            for b in blocks:
+                if isinstance(b, Paragraph):
+                    text = _paragraph_text(b)
+                    is_b = _is_bullet(b)
+                    has_marker = (
+                        not is_b
+                        and bool(text)
+                        and _compound.has_list_marker_prefix(text)
+                    )
+                    block_infos.append(
+                        _compound._BlockInfo(
+                            text=text,
+                            is_paragraph=True,
+                            is_bullet=is_b,
+                            has_marker_prefix=has_marker,
+                        )
+                    )
+                else:
+                    # Tables (or anything non-paragraph) break a list run
+                    # naturally; record a placeholder so indices line up.
+                    block_infos.append(
+                        _compound._BlockInfo(
+                            text="", is_paragraph=False,
+                            is_bullet=False, has_marker_prefix=False,
+                        )
+                    )
+            for grp in _compound.detect_groups(block_infos):
+                lead_in_at[grp.lead_in_idx] = grp
+                for j in grp.item_indices:
+                    claimed_items.add(j)
+        except Exception:  # noqa: BLE001 — defensive: pre-pass must never abort the walk
+            _logger.warning(
+                "compound pre-pass failed for parent at row_ref=%s; "
+                "falling back to legacy per-paragraph behaviour.",
+                row_ref,
+                exc_info=True,
+            )
+            lead_in_at = {}
+            claimed_items = set()
+
+    # ----- Main walk ----------------------------------------------------
+
+    for idx, block in enumerate(blocks):
         if isinstance(block, Paragraph):
             text = _paragraph_text(block)
             if not text:
@@ -444,6 +704,71 @@ def _walk_content(
             if level is not None:
                 _update_heading_trail(ctx.heading_trail, level, text)
                 continue
+
+            # Compound: skip a paragraph that was claimed as a list item
+            # by an earlier lead-in.  The aggregated requirement was
+            # already emitted when the lead-in fired.
+            if idx in claimed_items:
+                continue
+
+            # Compound: this paragraph IS the lead-in of a group.  Emit
+            # one aggregated requirement using the synthetic compound
+            # text and mark the row_ref / block_ref so reviewers can
+            # tell the row apart from a regular paragraph match.
+            grp = lead_in_at.get(idx)
+            if grp is not None:
+                paragraph_idx += 1
+                br = _push_ref(f"Paragraph {paragraph_idx} (compound)")
+                actor_for_this = _pick_primary(
+                    grp.aggregated_text, primary_actor, candidate_actors
+                )
+                # Reviewer context: the original lead-in plus the items,
+                # whitespace-collapsed.  ``_build_context`` will truncate
+                # at _MAX_CONTEXT_CHARS so very long lists don't bloat
+                # the column.
+                ctx_text = " ".join(
+                    [grp.lead_in_text] + list(grp.items)
+                )
+                try:
+                    req = _emit_candidate(
+                        grp.aggregated_text, ctx,
+                        row_ref=row_ref, block_ref=br,
+                        primary_actor=actor_for_this,
+                        force_requirement=force_requirement,
+                        context=ctx_text,
+                    )
+                except Exception:  # noqa: BLE001 — defensive: emit failure must not abort the walk
+                    _logger.warning(
+                        "compound emit failed for lead-in at idx=%d row_ref=%s; "
+                        "falling back to legacy emit for the lead-in paragraph only.",
+                        idx, row_ref,
+                        exc_info=True,
+                    )
+                    req = None
+                if req is not None:
+                    if req.notes:
+                        req.notes = (
+                            req.notes
+                            + "\nCompound requirement: lead-in + "
+                            + str(len(grp.items))
+                            + " "
+                            + grp.connector
+                            + "-joined item(s)."
+                        )
+                    else:
+                        req.notes = (
+                            "Compound requirement: lead-in + "
+                            + str(len(grp.items))
+                            + " "
+                            + grp.connector
+                            + "-joined item(s)."
+                        )
+                    req.secondary_actors = resolver_fn(
+                        grp.aggregated_text, actor_for_this
+                    )
+                    yield from _apply_multi_action(req, ctx, force_requirement)
+                continue
+
             if _is_bullet(block):
                 bullet_idx += 1
                 br = _push_ref(f"Bullet {bullet_idx}")
@@ -461,7 +786,7 @@ def _walk_content(
                 )
                 if req is not None:
                     req.secondary_actors = resolver_fn(text, actor_for_this)
-                    yield req
+                    yield from _apply_multi_action(req, ctx, force_requirement)
             else:
                 paragraph_idx += 1
                 br = _push_ref(f"Paragraph {paragraph_idx}")
@@ -480,7 +805,7 @@ def _walk_content(
                     )
                     if req is not None:
                         req.secondary_actors = resolver_fn(sent, actor_for_this)
-                        yield req
+                        yield from _apply_multi_action(req, ctx, force_requirement)
         elif isinstance(block, Table):
             nested_table_idx += 1
             table_tag = f"Nested Table {nested_table_idx}"
@@ -521,7 +846,7 @@ def _walk_content(
                             )
                             if req is not None:
                                 req.secondary_actors = resolver_fn(sent, primary_actor)
-                                yield req
+                                yield from _apply_multi_action(req, ctx, force_requirement)
 
 
 # ---------------------------------------------------------------------------
@@ -594,7 +919,8 @@ def parse_docx_events(
                 )
                 if req is not None:
                     req.secondary_actors = resolver_fn(sent, "")
-                    events.append(RequirementEvent(requirement=req))
+                    for emitted in _apply_multi_action(req, ctx, False):
+                        events.append(RequirementEvent(requirement=emitted))
             continue
 
         if isinstance(block, Table):

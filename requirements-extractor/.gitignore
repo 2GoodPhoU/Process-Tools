@@ -41,4 +41,4 @@ Thumbs.db
 /requirements_statement_set.csv
 *.reqif
 # (Note: the above are root-level only. Fixture outputs under
-# samples/ are explicitly co
+# samples/ are explicitly committed.)

@@ -8,6 +8,141 @@ changes — they will always be called out under a **Breaking** subhead.
 
 ## [Unreleased]
 
+## [0.6.2] — 2026-04-27
+
+### Added — multi-action requirement detection + decomposition
+- New `requirements_extractor/multi_action.py` module.  An additive
+  parser post-pass detects single-modal sentences with multiple verb
+  phrases (e.g. *"Software engineers shall create unit tests,
+  implement CICD Pipelines, and integrate software quality control
+  systems."*) and either flags them for reviewer attention or splits
+  them into N atomic sub-requirements with hierarchical sub-IDs.
+  Per ISO/IEC/IEEE 29148 §5.2.4 (Singular principle) and INCOSE
+  *Guide for Writing Requirements*, each requirement should express
+  one thought.
+- Three modes selected via `extraction.multi_action.mode`:
+  - `single` — emit one requirement, source-faithful, byte-identical
+    to 0.6.1 output.
+  - `flag` (DEFAULT) — emit one requirement with a one-line
+    `Multi-action sentence: …` note in the `notes` column.
+  - `split` — emit the parent (text preserved) plus N child rows.
+    Children carry hierarchical sub-IDs (`REQ-abc12345.1`,
+    `REQ-abc12345.2`, …), parent's actor / heading / source-line
+    context, and a `parent_id` field linking back to the parent.
+- spaCy dependency-parser path with a regex fallback for the
+  air-gapped binary; mirrors the offline-fallback architecture from
+  `actor_heuristics.py`.
+- Shared-verb disambiguation gate: phrases that all share the same
+  normalised head verb (e.g. *"shall be available 99.9% … with mean
+  time to recovery less than 1 hour"*) are kept as a single
+  requirement.  Imperfect heuristic (~80%); flagged on the detection
+  record for reviewer surfacing.
+- Procedural required-action gate: detection is disabled when
+  `force_requirement=True` so multi-action splitting never fragments
+  rows in a `Required Action` table (mirrors the 0.6.1 compound
+  gate).  See PATCH-0.6.2-NOTES.md for the autonomous design call.
+- Five synthetic fixtures under `samples/procedures/multi_action/` and
+  their generator — Eric's canonical 3-action case, two-action OR,
+  shared-verb compound (negative), 0.6.1 compound + multi-action
+  pipeline interaction, and a multi-action sentence inside a
+  procedural required-action table (negative).
+- 44 new tests in `tests/test_multi_action.py` (pure-helper detection
+  rules, all 3 modes per fixture, config-flag wiring + mode
+  validation).
+
+### Added — 0.6.1 regression baseline test
+- `tests/baselines/procedures_baseline_0_6_1.json` (~70 KB) snapshots
+  the 0.6.1 row-level output for every fixture in
+  `samples/procedures/` AND `samples/procedures/compound/` (all 16
+  fixtures).
+- `tests/test_regression_baseline_062.py` (3 tests) re-parses each
+  fixture in `single` mode and asserts its row count + every per-row
+  column (including `notes`) matches the 0.6.1 baseline byte-for-byte
+  — the canary for any unintended drift between 0.6.1 and 0.6.2 in
+  source-faithful single-mode operation.
+
+### Configuration
+- New `extraction.multi_action` namespace (or flat `multi_action`)
+  with three keys:
+  - `mode: flag` (default) | `single` | `split`
+  - `enabled: true` (default; set false to disable detection
+    entirely)
+  - `min_actions: 2` (default; only trigger when 2+ verb phrases
+    detected)
+- Invalid mode values and `min_actions < 2` are rejected with a
+  `ValueError` at config-load time.
+- The `extraction:` namespace key continues to accept `compound` and
+  now also accepts `multi_action`; both can be set together.
+
+### Schema
+- `Requirement` dataclass gains a new `parent_id` field (default
+  `""`) populated for split-mode sub-requirements only.  Existing
+  writers ignore the field; ReqIF export of decomposition relations
+  is documented but deferred (separate patch).
+
+### Behaviour preserved (intentionally)
+- Default `single` and `enabled: false` modes both produce
+  byte-identical row-level output to 0.6.1, including the existing
+  `notes` annotations from 0.6.1 compound rows.  Pinned by the new
+  regression baseline test.
+- All 559 pre-existing tests pass unchanged.
+
+### Known limitations
+- Shared-verb heuristic is ~80% accurate; `imperfect` flag on the
+  detection record marks ambiguous cases.
+- Irregular verb forms (`hold`/`held`, `write`/`wrote`) won't
+  normalise to the same lemma.
+- Cross-modal sentences (two `shall`/`must` tokens) are explicitly
+  rejected by the detection algorithm.
+- ReqIF decomposition-relation export is documented in
+  PATCH-0.6.2-NOTES.md but not yet implemented.
+
+## [0.6.1] — 2026-04-27
+
+### Added — compound-requirement detection
+- New `requirements_extractor/compound.py` module.  An additive parser
+  pre-pass detects modal-verb paragraphs ending with `:` followed by a
+  bulleted / dashed / numbered / lettered list of conditions, and
+  aggregates them into a single compound requirement.  Captures the
+  field-gap pattern where a lead-in paragraph (no terminal punctuation,
+  ends in `:`) and its conditions (no modal verbs) both fell through
+  the 0.6.0 detector and emitted zero requirements.
+- Connectors (`and` / `or` / `unless`) inferred from items' trailing
+  tokens; rendered as `(all of)`, `(any of)`, or `(unless any of)` in
+  the synthetic compound text so reviewers see polarity at a glance.
+- `where:` definition-list lead-ins are explicitly excluded — those
+  introduce glossary blocks, not condition lists, and are left to the
+  legacy per-paragraph walker.
+- Five synthetic fixtures under `samples/procedures/compound/` and
+  their generator (`generate.py`) — AND list, OR list, mixed
+  numbered/dash markers, `where:` negative case, `unless:` exclusion.
+- 45 new tests in `tests/test_compound.py` (pure-helper rules +
+  end-to-end fixture parses + config-flag wiring).
+
+### Added — regression baseline test
+- `tests/baselines/procedures_baseline_0_6_0.json` (60 KB) snapshots
+  the 0.6.0 row-level output for every fixture in `samples/procedures/`.
+- `tests/test_regression_baseline.py` (3 tests) re-parses each fixture
+  and asserts its row count + every per-row column matches the
+  baseline byte-for-byte — the canary for any unintended drift in
+  the shipping parser.
+
+### Configuration
+- New `extraction.compound.enabled` flag (or flat `compound.enabled`).
+  Default ON.  Set to `false` in any `--config` or per-doc
+  `<stem>.reqx.yaml` to revert compound detection without rebuilding
+  the binary.
+- The `extraction:` namespace key is accepted at the top level as a
+  natural-language wrapper around `compound`; keys other than
+  `compound` under `extraction` are rejected with a clear error.
+
+### Behaviour preserved (intentionally)
+- Procedural required-action tables (`force_requirement=True`) skip
+  compound detection.  Each bullet is already an atomic requirement
+  by virtue of the column header; aggregating would *drop*
+  requirements rather than capture additional ones.  Documented as
+  the autonomous design call in `PATCH-0.6.1-NOTES.md`.
+
 ## [0.6.0] — 2026-04-26
 
 ### Added — rule-based actor-extraction fallback

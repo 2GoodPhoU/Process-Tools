@@ -1,0 +1,2060 @@
+{
+  "version": "0.6.1",
+  "files": {
+    "ambiguous_roles.docx": {
+      "count": 5,
+      "rows": [
+        {
+          "order": 1,
+          "source_file": "ambiguous_roles.docx",
+          "row_ref": "Table 1, Row 1",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Ops Engineer",
+          "secondary_actors": [],
+          "text": "The Ops Engineer shall open a triage channel within 5 minutes of page acknowledgement.",
+          "req_type": "Hard",
+          "keywords": [
+            "shall"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-23529e57",
+          "notes": ""
+        },
+        {
+          "order": 2,
+          "source_file": "ambiguous_roles.docx",
+          "row_ref": "Table 1, Row 1",
+          "block_ref": "Nested Table 1 R1C2 > Paragraph 1",
+          "primary_actor": "Ops Engineer",
+          "secondary_actors": [],
+          "text": "The Operations Engineer must capture the initial alert payload and paste it into the channel.",
+          "req_type": "Hard",
+          "keywords": [
+            "must"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-5791c7ac",
+          "notes": ""
+        },
+        {
+          "order": 3,
+          "source_file": "ambiguous_roles.docx",
+          "row_ref": "Table 1, Row 1",
+          "block_ref": "Nested Table 1 R2C2 > Paragraph 1",
+          "primary_actor": "Ops Engineer",
+          "secondary_actors": [],
+          "text": "The engineer shall page the on-call Platform Lead if the incident is not acknowledged within 10 minutes.",
+          "req_type": "Hard",
+          "keywords": [
+            "shall"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-af3da506",
+          "notes": ""
+        },
+        {
+          "order": 4,
+          "source_file": "ambiguous_roles.docx",
+          "row_ref": "Table 1, Row 1",
+          "block_ref": "Nested Table 1 R3C2 > Paragraph 1",
+          "primary_actor": "Ops Engineer",
+          "secondary_actors": [],
+          "text": "The Platform Lead must join the triage channel and assume incident command.",
+          "req_type": "Hard",
+          "keywords": [
+            "must"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-583b457f",
+          "notes": ""
+        },
+        {
+          "order": 5,
+          "source_file": "ambiguous_roles.docx",
+          "row_ref": "Table 1, Row 2",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Platform-Lead",
+          "secondary_actors": [],
+          "text": "The Platform-Lead shall designate a scribe and a communicator within the first 15 minutes of the incident.",
+          "req_type": "Hard",
+          "keywords": [
+            "shall"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-8ad2a4e3",
+          "notes": ""
+        }
+      ]
+    },
+    "implicit_system_actor.docx": {
+      "count": 5,
+      "rows": [
+        {
+          "order": 1,
+          "source_file": "implicit_system_actor.docx",
+          "row_ref": "Table 1, Row 1",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "System",
+          "secondary_actors": [],
+          "text": "At 02:00 local, the system shall begin a full snapshot of the primary data volume.",
+          "req_type": "Hard",
+          "keywords": [
+            "shall"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-aee1465c",
+          "notes": ""
+        },
+        {
+          "order": 2,
+          "source_file": "implicit_system_actor.docx",
+          "row_ref": "Table 1, Row 2",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "System",
+          "secondary_actors": [],
+          "text": "The system must verify snapshot integrity before promoting the image to the off-site store.",
+          "req_type": "Hard",
+          "keywords": [
+            "must"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-cef24e52",
+          "notes": ""
+        },
+        {
+          "order": 3,
+          "source_file": "implicit_system_actor.docx",
+          "row_ref": "Table 1, Row 3",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "",
+          "secondary_actors": [],
+          "text": "A summary report shall be emailed to the on-call distribution list once the run completes.",
+          "req_type": "Hard",
+          "keywords": [
+            "shall"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-1d2c5887",
+          "notes": ""
+        },
+        {
+          "order": 4,
+          "source_file": "implicit_system_actor.docx",
+          "row_ref": "Table 1, Row 4",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "System",
+          "secondary_actors": [],
+          "text": "If verification fails, the system must retain the primary volume in read-write mode and page the on-call engineer.",
+          "req_type": "Hard",
+          "keywords": [
+            "must"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-8761f682",
+          "notes": ""
+        },
+        {
+          "order": 5,
+          "source_file": "implicit_system_actor.docx",
+          "row_ref": "Table 1, Row 5",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "",
+          "secondary_actors": [],
+          "text": "Retention policy shall prune snapshots older than 30 days.",
+          "req_type": "Hard",
+          "keywords": [
+            "shall"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-e8354268",
+          "notes": ""
+        }
+      ]
+    },
+    "long_procedure.docx": {
+      "count": 52,
+      "rows": [
+        {
+          "order": 1,
+          "source_file": "long_procedure.docx",
+          "row_ref": "Table 1, Row 1",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "QA Lead",
+          "secondary_actors": [],
+          "text": "Step 1: The QA Lead shall verify the build manifest before the next gate.",
+          "req_type": "Hard",
+          "keywords": [
+            "shall"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-2d1e6d4e",
+          "notes": ""
+        },
+        {
+          "order": 2,
+          "source_file": "long_procedure.docx",
+          "row_ref": "Table 1, Row 2",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Release Manager",
+          "secondary_actors": [],
+          "text": "Step 2: The Release Manager must confirm the release candidate artifact before the next gate.",
+          "req_type": "Hard",
+          "keywords": [
+            "must"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-02391dbd",
+          "notes": ""
+        },
+        {
+          "order": 3,
+          "source_file": "long_procedure.docx",
+          "row_ref": "Table 1, Row 3",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Duty Engineer",
+          "secondary_actors": [],
+          "text": "Step 3: The Duty Engineer shall record the canary telemetry dashboard before the next gate.",
+          "req_type": "Hard",
+          "keywords": [
+            "shall"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-c51373ac",
+          "notes": ""
+        },
+        {
+          "order": 4,
+          "source_file": "long_procedure.docx",
+          "row_ref": "Table 1, Row 4",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Security Officer",
+          "secondary_actors": [],
+          "text": "Step 4: The Security Officer must notify the rollback plan before the next gate.",
+          "req_type": "Hard",
+          "keywords": [
+            "must"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-d3cf1fb8",
+          "notes": ""
+        },
+        {
+          "order": 5,
+          "source_file": "long_procedure.docx",
+          "row_ref": "Table 1, Row 5",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "QA Lead",
+          "secondary_actors": [],
+          "text": "Step 5: The QA Lead shall validate the incident response runbook before the next gate.",
+          "req_type": "Hard",
+          "keywords": [
+            "shall"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-c2a2b088",
+          "notes": ""
+        },
+        {
+          "order": 6,
+          "source_file": "long_procedure.docx",
+          "row_ref": "Table 1, Row 6",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Release Manager",
+          "secondary_actors": [],
+          "text": "Step 6: The Release Manager must sign off the change-management ticket before the next gate.",
+          "req_type": "Hard",
+          "keywords": [
+            "must"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-04017998",
+          "notes": ""
+        },
+        {
+          "order": 7,
+          "source_file": "long_procedure.docx",
+          "row_ref": "Table 1, Row 7",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Duty Engineer",
+          "secondary_actors": [],
+          "text": "Step 7: The Duty Engineer shall capture the signed approval record before the next gate.",
+          "req_type": "Hard",
+          "keywords": [
+            "shall"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-6f459f13",
+          "notes": ""
+        },
+        {
+          "order": 8,
+          "source_file": "long_procedure.docx",
+          "row_ref": "Table 1, Row 8",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Security Officer",
+          "secondary_actors": [],
+          "text": "Step 8: The Security Officer must approve the post-deployment smoke suite before the next gate.",
+          "req_type": "Hard",
+          "keywords": [
+            "must"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-7f37afe5",
+          "notes": ""
+        },
+        {
+          "order": 9,
+          "source_file": "long_procedure.docx",
+          "row_ref": "Table 1, Row 9",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "QA Lead",
+          "secondary_actors": [],
+          "text": "Step 9: The QA Lead shall verify the security scan report before the next gate.",
+          "req_type": "Hard",
+          "keywords": [
+            "shall"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-686645cb",
+          "notes": ""
+        },
+        {
+          "order": 10,
+          "source_file": "long_procedure.docx",
+          "row_ref": "Table 1, Row 10",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Release Manager",
+          "secondary_actors": [],
+          "text": "Step 10: The Release Manager must confirm the compliance attestation before the next gate.",
+          "req_type": "Hard",
+          "keywords": [
+            "must"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-37251f70",
+          "notes": ""
+        },
+        {
+          "order": 11,
+          "source_file": "long_procedure.docx",
+          "row_ref": "Table 1, Row 11",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Duty Engineer",
+          "secondary_actors": [],
+          "text": "Step 11: The Duty Engineer shall record the build manifest before the next gate.",
+          "req_type": "Hard",
+          "keywords": [
+            "shall"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-1ae4d020",
+          "notes": ""
+        },
+        {
+          "order": 12,
+          "source_file": "long_procedure.docx",
+          "row_ref": "Table 1, Row 12",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Security Officer",
+          "secondary_actors": [],
+          "text": "Step 12: The Security Officer must notify the release candidate artifact before the next gate.",
+          "req_type": "Hard",
+          "keywords": [
+            "must"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-ee33838a",
+          "notes": ""
+        },
+        {
+          "order": 13,
+          "source_file": "long_procedure.docx",
+          "row_ref": "Table 1, Row 13",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "QA Lead",
+          "secondary_actors": [],
+          "text": "Step 13: The QA Lead shall validate the canary telemetry dashboard before the next gate.",
+          "req_type": "Hard",
+          "keywords": [
+            "shall"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-374ddd48",
+          "notes": ""
+        },
+        {
+          "order": 14,
+          "source_file": "long_procedure.docx",
+          "row_ref": "Table 1, Row 14",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Release Manager",
+          "secondary_actors": [],
+          "text": "Step 14: The Release Manager must sign off the rollback plan before the next gate.",
+          "req_type": "Hard",
+          "keywords": [
+            "must"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-980be942",
+          "notes": ""
+        },
+        {
+          "order": 15,
+          "source_file": "long_procedure.docx",
+          "row_ref": "Table 1, Row 15",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Duty Engineer",
+          "secondary_actors": [],
+          "text": "Step 15: The Duty Engineer shall capture the incident response runbook before the next gate.",
+          "req_type": "Hard",
+          "keywords": [
+            "shall"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-6dd33ff6",
+          "notes": ""
+        },
+        {
+          "order": 16,
+          "source_file": "long_procedure.docx",
+          "row_ref": "Table 1, Row 16",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Security Officer",
+          "secondary_actors": [],
+          "text": "Step 16: The Security Officer must approve the change-management ticket before the next gate.",
+          "req_type": "Hard",
+          "keywords": [
+            "must"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-c70052d5",
+          "notes": ""
+        },
+        {
+          "order": 17,
+          "source_file": "long_procedure.docx",
+          "row_ref": "Table 1, Row 17",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "QA Lead",
+          "secondary_actors": [],
+          "text": "Step 17: The QA Lead shall verify the signed approval record before the next gate.",
+          "req_type": "Hard",
+          "keywords": [
+            "shall"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-18e56dba",
+          "notes": ""
+        },
+        {
+          "order": 18,
+          "source_file": "long_procedure.docx",
+          "row_ref": "Table 1, Row 18",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Release Manager",
+          "secondary_actors": [],
+          "text": "Step 18: The Release Manager must confirm the post-deployment smoke suite before the next gate.",
+          "req_type": "Hard",
+          "keywords": [
+            "must"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-546c6a46",
+          "notes": ""
+        },
+        {
+          "order": 19,
+          "source_file": "long_procedure.docx",
+          "row_ref": "Table 1, Row 19",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Duty Engineer",
+          "secondary_actors": [],
+          "text": "Step 19: The Duty Engineer shall record the security scan report before the next gate.",
+          "req_type": "Hard",
+          "keywords": [
+            "shall"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-875683af",
+          "notes": ""
+        },
+        {
+          "order": 20,
+          "source_file": "long_procedure.docx",
+          "row_ref": "Table 1, Row 20",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Security Officer",
+          "secondary_actors": [],
+          "text": "Step 20: The Security Officer must notify the compliance attestation before the next gate.",
+          "req_type": "Hard",
+          "keywords": [
+            "must"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-79ecf3eb",
+          "notes": ""
+        },
+        {
+          "order": 21,
+          "source_file": "long_procedure.docx",
+          "row_ref": "Table 1, Row 21",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "QA Lead",
+          "secondary_actors": [],
+          "text": "Step 21: The QA Lead shall validate the build manifest before the next gate.",
+          "req_type": "Hard",
+          "keywords": [
+            "shall"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-16cbe81c",
+          "notes": ""
+        },
+        {
+          "order": 22,
+          "source_file": "long_procedure.docx",
+          "row_ref": "Table 1, Row 22",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Release Manager",
+          "secondary_actors": [],
+          "text": "Step 22: The Release Manager must sign off the release candidate artifact before the next gate.",
+          "req_type": "Hard",
+          "keywords": [
+            "must"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-798205e7",
+          "notes": ""
+        },
+        {
+          "order": 23,
+          "source_file": "long_procedure.docx",
+          "row_ref": "Table 1, Row 23",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Duty Engineer",
+          "secondary_actors": [],
+          "text": "Step 23: The Duty Engineer shall capture the canary telemetry dashboard before the next gate.",
+          "req_type": "Hard",
+          "keywords": [
+            "shall"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-27c38f91",
+          "notes": ""
+        },
+        {
+          "order": 24,
+          "source_file": "long_procedure.docx",
+          "row_ref": "Table 1, Row 24",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Security Officer",
+          "secondary_actors": [],
+          "text": "Step 24: The Security Officer must approve the rollback plan before the next gate.",
+          "req_type": "Hard",
+          "keywords": [
+            "must"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-0bd58a26",
+          "notes": ""
+        },
+        {
+          "order": 25,
+          "source_file": "long_procedure.docx",
+          "row_ref": "Table 1, Row 25",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "QA Lead",
+          "secondary_actors": [],
+          "text": "Step 25: The QA Lead shall verify the incident response runbook before the next gate.",
+          "req_type": "Hard",
+          "keywords": [
+            "shall"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-c9cb0a1f",
+          "notes": ""
+        },
+        {
+          "order": 26,
+          "source_file": "long_procedure.docx",
+          "row_ref": "Table 1, Row 26",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Release Manager",
+          "secondary_actors": [],
+          "text": "Step 26: The Release Manager must confirm the change-management ticket before the next gate.",
+          "req_type": "Hard",
+          "keywords": [
+            "must"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-3699452c",
+          "notes": ""
+        },
+        {
+          "order": 27,
+          "source_file": "long_procedure.docx",
+          "row_ref": "Table 1, Row 27",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Duty Engineer",
+          "secondary_actors": [],
+          "text": "Step 27: The Duty Engineer shall record the signed approval record before the next gate.",
+          "req_type": "Hard",
+          "keywords": [
+            "shall"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-41df0db3",
+          "notes": ""
+        },
+        {
+          "order": 28,
+          "source_file": "long_procedure.docx",
+          "row_ref": "Table 1, Row 28",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Security Officer",
+          "secondary_actors": [],
+          "text": "Step 28: The Security Officer must notify the post-deployment smoke suite before the next gate.",
+          "req_type": "Hard",
+          "keywords": [
+            "must"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-62f4da68",
+          "notes": ""
+        },
+        {
+          "order": 29,
+          "source_file": "long_procedure.docx",
+          "row_ref": "Table 1, Row 29",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "QA Lead",
+          "secondary_actors": [],
+          "text": "Step 29: The QA Lead shall validate the security scan report before the next gate.",
+          "req_type": "Hard",
+          "keywords": [
+            "shall"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-d450553c",
+          "notes": ""
+        },
+        {
+          "order": 30,
+          "source_file": "long_procedure.docx",
+          "row_ref": "Table 1, Row 30",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Release Manager",
+          "secondary_actors": [],
+          "text": "Step 30: The Release Manager must sign off the compliance attestation before the next gate.",
+          "req_type": "Hard",
+          "keywords": [
+            "must"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-1b83a583",
+          "notes": ""
+        },
+        {
+          "order": 31,
+          "source_file": "long_procedure.docx",
+          "row_ref": "Table 1, Row 31",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Duty Engineer",
+          "secondary_actors": [],
+          "text": "Step 31: The Duty Engineer shall capture the build manifest before the next gate.",
+          "req_type": "Hard",
+          "keywords": [
+            "shall"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-8ac5fd7e",
+          "notes": ""
+        },
+        {
+          "order": 32,
+          "source_file": "long_procedure.docx",
+          "row_ref": "Table 1, Row 32",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Security Officer",
+          "secondary_actors": [],
+          "text": "Step 32: The Security Officer must approve the release candidate artifact before the next gate.",
+          "req_type": "Hard",
+          "keywords": [
+            "must"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-2ca607f9",
+          "notes": ""
+        },
+        {
+          "order": 33,
+          "source_file": "long_procedure.docx",
+          "row_ref": "Table 1, Row 33",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "QA Lead",
+          "secondary_actors": [],
+          "text": "Step 33: The QA Lead shall verify the canary telemetry dashboard before the next gate.",
+          "req_type": "Hard",
+          "keywords": [
+            "shall"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-63ea076a",
+          "notes": ""
+        },
+        {
+          "order": 34,
+          "source_file": "long_procedure.docx",
+          "row_ref": "Table 1, Row 34",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Release Manager",
+          "secondary_actors": [],
+          "text": "Step 34: The Release Manager must confirm the rollback plan before the next gate.",
+          "req_type": "Hard",
+          "keywords": [
+            "must"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-f5335919",
+          "notes": ""
+        },
+        {
+          "order": 35,
+          "source_file": "long_procedure.docx",
+          "row_ref": "Table 1, Row 35",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Duty Engineer",
+          "secondary_actors": [],
+          "text": "Step 35: The Duty Engineer shall record the incident response runbook before the next gate.",
+          "req_type": "Hard",
+          "keywords": [
+            "shall"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-95dcbb70",
+          "notes": ""
+        },
+        {
+          "order": 36,
+          "source_file": "long_procedure.docx",
+          "row_ref": "Table 1, Row 36",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Security Officer",
+          "secondary_actors": [],
+          "text": "Step 36: The Security Officer must notify the change-management ticket before the next gate.",
+          "req_type": "Hard",
+          "keywords": [
+            "must"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-9e28b875",
+          "notes": ""
+        },
+        {
+          "order": 37,
+          "source_file": "long_procedure.docx",
+          "row_ref": "Table 1, Row 37",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "QA Lead",
+          "secondary_actors": [],
+          "text": "Step 37: The QA Lead shall validate the signed approval record before the next gate.",
+          "req_type": "Hard",
+          "keywords": [
+            "shall"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-17cd1b6a",
+          "notes": ""
+        },
+        {
+          "order": 38,
+          "source_file": "long_procedure.docx",
+          "row_ref": "Table 1, Row 38",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Release Manager",
+          "secondary_actors": [],
+          "text": "Step 38: The Release Manager must sign off the post-deployment smoke suite before the next gate.",
+          "req_type": "Hard",
+          "keywords": [
+            "must"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-74d59201",
+          "notes": ""
+        },
+        {
+          "order": 39,
+          "source_file": "long_procedure.docx",
+          "row_ref": "Table 1, Row 39",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Duty Engineer",
+          "secondary_actors": [],
+          "text": "Step 39: The Duty Engineer shall capture the security scan report before the next gate.",
+          "req_type": "Hard",
+          "keywords": [
+            "shall"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-aca011f0",
+          "notes": ""
+        },
+        {
+          "order": 40,
+          "source_file": "long_procedure.docx",
+          "row_ref": "Table 1, Row 40",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Security Officer",
+          "secondary_actors": [],
+          "text": "Step 40: The Security Officer must approve the compliance attestation before the next gate.",
+          "req_type": "Hard",
+          "keywords": [
+            "must"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-087fc698",
+          "notes": ""
+        },
+        {
+          "order": 41,
+          "source_file": "long_procedure.docx",
+          "row_ref": "Table 1, Row 41",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "QA Lead",
+          "secondary_actors": [],
+          "text": "Step 41: The QA Lead shall verify the build manifest before the next gate.",
+          "req_type": "Hard",
+          "keywords": [
+            "shall"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-38135884",
+          "notes": ""
+        },
+        {
+          "order": 42,
+          "source_file": "long_procedure.docx",
+          "row_ref": "Table 1, Row 42",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Release Manager",
+          "secondary_actors": [],
+          "text": "Step 42: The Release Manager must confirm the release candidate artifact before the next gate.",
+          "req_type": "Hard",
+          "keywords": [
+            "must"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-1b587766",
+          "notes": ""
+        },
+        {
+          "order": 43,
+          "source_file": "long_procedure.docx",
+          "row_ref": "Table 1, Row 43",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Duty Engineer",
+          "secondary_actors": [],
+          "text": "Step 43: The Duty Engineer shall record the canary telemetry dashboard before the next gate.",
+          "req_type": "Hard",
+          "keywords": [
+            "shall"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-3a1cb8e4",
+          "notes": ""
+        },
+        {
+          "order": 44,
+          "source_file": "long_procedure.docx",
+          "row_ref": "Table 1, Row 44",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Security Officer",
+          "secondary_actors": [],
+          "text": "Step 44: The Security Officer must notify the rollback plan before the next gate.",
+          "req_type": "Hard",
+          "keywords": [
+            "must"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-b07e3a24",
+          "notes": ""
+        },
+        {
+          "order": 45,
+          "source_file": "long_procedure.docx",
+          "row_ref": "Table 1, Row 45",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "QA Lead",
+          "secondary_actors": [],
+          "text": "Step 45: The QA Lead shall validate the incident response runbook before the next gate.",
+          "req_type": "Hard",
+          "keywords": [
+            "shall"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-e0851da0",
+          "notes": ""
+        },
+        {
+          "order": 46,
+          "source_file": "long_procedure.docx",
+          "row_ref": "Table 1, Row 46",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Release Manager",
+          "secondary_actors": [],
+          "text": "Step 46: The Release Manager must sign off the change-management ticket before the next gate.",
+          "req_type": "Hard",
+          "keywords": [
+            "must"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-82f121b1",
+          "notes": ""
+        },
+        {
+          "order": 47,
+          "source_file": "long_procedure.docx",
+          "row_ref": "Table 1, Row 47",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Duty Engineer",
+          "secondary_actors": [],
+          "text": "Step 47: The Duty Engineer shall capture the signed approval record before the next gate.",
+          "req_type": "Hard",
+          "keywords": [
+            "shall"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-6717f3bb",
+          "notes": ""
+        },
+        {
+          "order": 48,
+          "source_file": "long_procedure.docx",
+          "row_ref": "Table 1, Row 48",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Security Officer",
+          "secondary_actors": [],
+          "text": "Step 48: The Security Officer must approve the post-deployment smoke suite before the next gate.",
+          "req_type": "Hard",
+          "keywords": [
+            "must"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-dc95153a",
+          "notes": ""
+        },
+        {
+          "order": 49,
+          "source_file": "long_procedure.docx",
+          "row_ref": "Table 1, Row 49",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "QA Lead",
+          "secondary_actors": [],
+          "text": "Step 49: The QA Lead shall verify the security scan report before the next gate.",
+          "req_type": "Hard",
+          "keywords": [
+            "shall"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-913fe7a8",
+          "notes": ""
+        },
+        {
+          "order": 50,
+          "source_file": "long_procedure.docx",
+          "row_ref": "Table 1, Row 50",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Release Manager",
+          "secondary_actors": [],
+          "text": "Step 50: The Release Manager must confirm the compliance attestation before the next gate.",
+          "req_type": "Hard",
+          "keywords": [
+            "must"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-d36895e9",
+          "notes": ""
+        },
+        {
+          "order": 51,
+          "source_file": "long_procedure.docx",
+          "row_ref": "Table 1, Row 51",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Duty Engineer",
+          "secondary_actors": [],
+          "text": "Step 51: The Duty Engineer shall record the build manifest before the next gate.",
+          "req_type": "Hard",
+          "keywords": [
+            "shall"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-cc35a1ed",
+          "notes": ""
+        },
+        {
+          "order": 52,
+          "source_file": "long_procedure.docx",
+          "row_ref": "Table 1, Row 52",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Security Officer",
+          "secondary_actors": [],
+          "text": "Step 52: The Security Officer must notify the release candidate artifact before the next gate.",
+          "req_type": "Hard",
+          "keywords": [
+            "must"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-f567b0ba",
+          "notes": ""
+        }
+      ]
+    },
+    "mixed_language.docx": {
+      "count": 4,
+      "rows": [
+        {
+          "order": 1,
+          "source_file": "mixed_language.docx",
+          "row_ref": "Preamble",
+          "block_ref": "Paragraph",
+          "primary_actor": "",
+          "secondary_actors": [],
+          "text": "Only the English rows should be captured as requirements.",
+          "req_type": "Soft",
+          "keywords": [
+            "should"
+          ],
+          "confidence": "Medium",
+          "polarity": "Positive",
+          "stable_id": "REQ-399dc9e7",
+          "notes": "Soft language — verify with author whether this is a binding requirement."
+        },
+        {
+          "order": 2,
+          "source_file": "mixed_language.docx",
+          "row_ref": "Table 1, Row 1",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Account Manager",
+          "secondary_actors": [],
+          "text": "The Account Manager shall validate the customer identification before creating any account.",
+          "req_type": "Hard",
+          "keywords": [
+            "shall"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-c5590a7e",
+          "notes": ""
+        },
+        {
+          "order": 3,
+          "source_file": "mixed_language.docx",
+          "row_ref": "Table 1, Row 3",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Compliance Officer",
+          "secondary_actors": [],
+          "text": "The Compliance Officer must review the validation result within two business days.",
+          "req_type": "Hard",
+          "keywords": [
+            "must"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-ba0be02a",
+          "notes": ""
+        },
+        {
+          "order": 4,
+          "source_file": "mixed_language.docx",
+          "row_ref": "Table 1, Row 5",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Account Manager",
+          "secondary_actors": [],
+          "text": "The Account Manager shall notify the customer of the approval decision via the registered email address.",
+          "req_type": "Hard",
+          "keywords": [
+            "shall"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-1ec595ab",
+          "notes": ""
+        }
+      ]
+    },
+    "parallel_flows.docx": {
+      "count": 8,
+      "rows": [
+        {
+          "order": 1,
+          "source_file": "parallel_flows.docx",
+          "row_ref": "Table 1, Row 1",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "QA Lead",
+          "secondary_actors": [],
+          "text": "The QA Lead shall begin the smoke-test suite against the release candidate build.",
+          "req_type": "Hard",
+          "keywords": [
+            "shall"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-f4fd0c17",
+          "notes": ""
+        },
+        {
+          "order": 2,
+          "source_file": "parallel_flows.docx",
+          "row_ref": "Table 1, Row 2",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Release Manager",
+          "secondary_actors": [],
+          "text": "The Release Manager must stage the deployment package in the canary environment.",
+          "req_type": "Hard",
+          "keywords": [
+            "must"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-99a85150",
+          "notes": ""
+        },
+        {
+          "order": 3,
+          "source_file": "parallel_flows.docx",
+          "row_ref": "Table 1, Row 3",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "QA Lead",
+          "secondary_actors": [],
+          "text": "The QA Lead shall record smoke-test results in the release tracker within 30 minutes.",
+          "req_type": "Hard",
+          "keywords": [
+            "shall"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-e7c54f91",
+          "notes": ""
+        },
+        {
+          "order": 4,
+          "source_file": "parallel_flows.docx",
+          "row_ref": "Table 1, Row 4",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Release Manager",
+          "secondary_actors": [],
+          "text": "The Release Manager must confirm canary health telemetry for at least 10 minutes before promotion.",
+          "req_type": "Hard",
+          "keywords": [
+            "must"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-742cdbe5",
+          "notes": ""
+        },
+        {
+          "order": 5,
+          "source_file": "parallel_flows.docx",
+          "row_ref": "Table 1, Row 5",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "QA Lead",
+          "secondary_actors": [],
+          "text": "The QA Lead shall sign off on the release once all smoke tests pass.",
+          "req_type": "Hard",
+          "keywords": [
+            "shall"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-3fb01a7d",
+          "notes": ""
+        },
+        {
+          "order": 6,
+          "source_file": "parallel_flows.docx",
+          "row_ref": "Table 1, Row 6",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Release Manager",
+          "secondary_actors": [],
+          "text": "The Release Manager must promote the canary to production only after QA sign-off.",
+          "req_type": "Hard",
+          "keywords": [
+            "must"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-50c311c4",
+          "notes": ""
+        },
+        {
+          "order": 7,
+          "source_file": "parallel_flows.docx",
+          "row_ref": "Table 1, Row 7",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "QA Lead",
+          "secondary_actors": [],
+          "text": "If any smoke test fails, the QA Lead shall halt the release and notify the Release Manager.",
+          "req_type": "Hard",
+          "keywords": [
+            "shall"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-927f3e34",
+          "notes": ""
+        },
+        {
+          "order": 8,
+          "source_file": "parallel_flows.docx",
+          "row_ref": "Table 1, Row 8",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Release Manager",
+          "secondary_actors": [],
+          "text": "On halt, the Release Manager must roll back the canary and capture diagnostic logs for the post-mortem.",
+          "req_type": "Hard",
+          "keywords": [
+            "must"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-e3fdeab4",
+          "notes": ""
+        }
+      ]
+    },
+    "passive_voice.docx": {
+      "count": 4,
+      "rows": [
+        {
+          "order": 1,
+          "source_file": "passive_voice.docx",
+          "row_ref": "Table 1, Row 1",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Change Board",
+          "secondary_actors": [],
+          "text": "Each change request shall be reviewed by the Change Board before any production deployment.",
+          "req_type": "Hard",
+          "keywords": [
+            "shall"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-36fb71fd",
+          "notes": ""
+        },
+        {
+          "order": 2,
+          "source_file": "passive_voice.docx",
+          "row_ref": "Table 1, Row 2",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Change Board",
+          "secondary_actors": [],
+          "text": "Approval must be granted by the Security Officer when the change touches authentication flows.",
+          "req_type": "Hard",
+          "keywords": [
+            "must"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-51a91d43",
+          "notes": ""
+        },
+        {
+          "order": 3,
+          "source_file": "passive_voice.docx",
+          "row_ref": "Table 1, Row 3",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Change Board",
+          "secondary_actors": [],
+          "text": "A rollback plan shall be signed off by the Release Manager prior to the change window.",
+          "req_type": "Hard",
+          "keywords": [
+            "shall"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-99e4cd45",
+          "notes": ""
+        },
+        {
+          "order": 4,
+          "source_file": "passive_voice.docx",
+          "row_ref": "Table 1, Row 4",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Change Board",
+          "secondary_actors": [],
+          "text": "Post-change validation must be completed by the Duty Engineer within 30 minutes of deployment.",
+          "req_type": "Hard",
+          "keywords": [
+            "must"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-ce8290b7",
+          "notes": ""
+        }
+      ]
+    },
+    "procedural_actor_continuation.docx": {
+      "count": 5,
+      "rows": [
+        {
+          "order": 1,
+          "source_file": "procedural_actor_continuation.docx",
+          "row_ref": "Table 1, Row 2",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Operator",
+          "secondary_actors": [],
+          "text": "The Operator shall log in to the control console and confirm the previous shift's handover notes.",
+          "req_type": "Hard",
+          "keywords": [
+            "shall"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-2e44b498",
+          "notes": ""
+        },
+        {
+          "order": 2,
+          "source_file": "procedural_actor_continuation.docx",
+          "row_ref": "Table 1, Row 3",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Operator",
+          "secondary_actors": [],
+          "text": "Verify that all subsystem status indicators read nominal and acknowledge any outstanding alarms.",
+          "req_type": "Hard",
+          "keywords": [
+            "(Required Action)"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-9ab06c93",
+          "notes": ""
+        },
+        {
+          "order": 3,
+          "source_file": "procedural_actor_continuation.docx",
+          "row_ref": "Table 1, Row 4",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Supervisor",
+          "secondary_actors": [],
+          "text": "The Supervisor must review the overnight alarm log before releasing the Operator to normal duties.",
+          "req_type": "Hard",
+          "keywords": [
+            "must"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-c017de36",
+          "notes": ""
+        },
+        {
+          "order": 4,
+          "source_file": "procedural_actor_continuation.docx",
+          "row_ref": "Table 1, Row 5",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Supervisor",
+          "secondary_actors": [],
+          "text": "Countersign the handover log once the checks are complete.",
+          "req_type": "Hard",
+          "keywords": [
+            "(Required Action)"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-e0304cd6",
+          "notes": ""
+        },
+        {
+          "order": 5,
+          "source_file": "procedural_actor_continuation.docx",
+          "row_ref": "Table 1, Row 6",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Operator",
+          "secondary_actors": [],
+          "text": "The Operator shall acknowledge receipt of the countersigned log and begin normal shift duties.",
+          "req_type": "Hard",
+          "keywords": [
+            "shall"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-ca13ef6c",
+          "notes": ""
+        }
+      ]
+    },
+    "procedural_bullet_rows.docx": {
+      "count": 10,
+      "rows": [
+        {
+          "order": 1,
+          "source_file": "procedural_bullet_rows.docx",
+          "row_ref": "Table 1, Row 2",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Release Manager",
+          "secondary_actors": [],
+          "text": "The Release Manager shall confirm that the build ID in the tracker matches the artifact SHA-256 in the pipeline.",
+          "req_type": "Hard",
+          "keywords": [
+            "shall"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-89ef00a0",
+          "notes": ""
+        },
+        {
+          "order": 2,
+          "source_file": "procedural_bullet_rows.docx",
+          "row_ref": "Table 1, Row 3",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "QA Lead",
+          "secondary_actors": [],
+          "text": "The QA Lead shall execute the following smoke checks:",
+          "req_type": "Hard",
+          "keywords": [
+            "shall"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-ce36c7bb",
+          "notes": ""
+        },
+        {
+          "order": 3,
+          "source_file": "procedural_bullet_rows.docx",
+          "row_ref": "Table 1, Row 3",
+          "block_ref": "Bullet 1",
+          "primary_actor": "QA Lead",
+          "secondary_actors": [],
+          "text": "Run the authentication smoke-test suite and record pass/fail per case.",
+          "req_type": "Hard",
+          "keywords": [
+            "(Required Action)"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-effe9215",
+          "notes": ""
+        },
+        {
+          "order": 4,
+          "source_file": "procedural_bullet_rows.docx",
+          "row_ref": "Table 1, Row 3",
+          "block_ref": "Bullet 2",
+          "primary_actor": "QA Lead",
+          "secondary_actors": [],
+          "text": "Exercise the canary endpoint with a synthetic payload under nominal load.",
+          "req_type": "Hard",
+          "keywords": [
+            "(Required Action)"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-80c5f981",
+          "notes": ""
+        },
+        {
+          "order": 5,
+          "source_file": "procedural_bullet_rows.docx",
+          "row_ref": "Table 1, Row 3",
+          "block_ref": "Bullet 3",
+          "primary_actor": "QA Lead",
+          "secondary_actors": [],
+          "text": "Confirm that the error budget dashboard is still green before clearing the gate.",
+          "req_type": "Hard",
+          "keywords": [
+            "(Required Action)"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-d8f264eb",
+          "notes": ""
+        },
+        {
+          "order": 6,
+          "source_file": "procedural_bullet_rows.docx",
+          "row_ref": "Table 1, Row 4",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "QA Lead",
+          "secondary_actors": [],
+          "text": "If any smoke check fails, halt the release and notify the on-call Release Manager immediately.",
+          "req_type": "Hard",
+          "keywords": [
+            "(Required Action)"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-a2d4f09a",
+          "notes": ""
+        },
+        {
+          "order": 7,
+          "source_file": "procedural_bullet_rows.docx",
+          "row_ref": "Table 1, Row 5",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Change Board",
+          "secondary_actors": [],
+          "text": "Before granting the final approval the Change Board must:",
+          "req_type": "Hard",
+          "keywords": [
+            "must"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-a546fbb5",
+          "notes": ""
+        },
+        {
+          "order": 8,
+          "source_file": "procedural_bullet_rows.docx",
+          "row_ref": "Table 1, Row 5",
+          "block_ref": "Bullet 1",
+          "primary_actor": "Change Board",
+          "secondary_actors": [],
+          "text": "Review the rollback plan and confirm it executes cleanly against the staging environment.",
+          "req_type": "Hard",
+          "keywords": [
+            "(Required Action)"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-290f80c0",
+          "notes": ""
+        },
+        {
+          "order": 9,
+          "source_file": "procedural_bullet_rows.docx",
+          "row_ref": "Table 1, Row 5",
+          "block_ref": "Bullet 2",
+          "primary_actor": "Change Board",
+          "secondary_actors": [],
+          "text": "Verify that the Security Officer has signed off when the change touches authentication flows.",
+          "req_type": "Hard",
+          "keywords": [
+            "(Required Action)"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-dccdafea",
+          "notes": ""
+        },
+        {
+          "order": 10,
+          "source_file": "procedural_bullet_rows.docx",
+          "row_ref": "Table 1, Row 5",
+          "block_ref": "Bullet 3",
+          "primary_actor": "Change Board",
+          "secondary_actors": [],
+          "text": "Record the approval decision and the quorum in the change register before the change window opens.",
+          "req_type": "Hard",
+          "keywords": [
+            "(Required Action)"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-a2b507fe",
+          "notes": ""
+        }
+      ]
+    },
+    "procedural_multi_actor_cell.docx": {
+      "count": 5,
+      "rows": [
+        {
+          "order": 1,
+          "source_file": "procedural_multi_actor_cell.docx",
+          "row_ref": "Preamble",
+          "block_ref": "Paragraph",
+          "primary_actor": "",
+          "secondary_actors": [],
+          "text": "The Actor column enumerates the eligible services; the Required action column's sentence subject names the one that actually carries out the step for a given row.",
+          "req_type": "Hard",
+          "keywords": [
+            "required"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-83134d0e",
+          "notes": ""
+        },
+        {
+          "order": 2,
+          "source_file": "procedural_multi_actor_cell.docx",
+          "row_ref": "Table 1, Row 2",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Gateway",
+          "secondary_actors": [],
+          "text": "The Gateway shall forward the incoming authentication request to the Auth Service without modification.",
+          "req_type": "Hard",
+          "keywords": [
+            "shall"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-e0629fd8",
+          "notes": ""
+        },
+        {
+          "order": 3,
+          "source_file": "procedural_multi_actor_cell.docx",
+          "row_ref": "Table 1, Row 3",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Auth Service",
+          "secondary_actors": [],
+          "text": "The Auth Service must verify the signed token against the published public key before any session state is created.",
+          "req_type": "Hard",
+          "keywords": [
+            "must"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-39dd0e27",
+          "notes": ""
+        },
+        {
+          "order": 4,
+          "source_file": "procedural_multi_actor_cell.docx",
+          "row_ref": "Table 1, Row 4",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Logger",
+          "secondary_actors": [],
+          "text": "The Logger shall emit a structured audit entry containing the request ID, the verifying service, and the outcome.",
+          "req_type": "Hard",
+          "keywords": [
+            "shall"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-7028bd85",
+          "notes": ""
+        },
+        {
+          "order": 5,
+          "source_file": "procedural_multi_actor_cell.docx",
+          "row_ref": "Table 1, Row 5",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Auth Service, Gateway, Logger",
+          "secondary_actors": [],
+          "text": "If the verification fails, the error shall be returned to the caller with HTTP status 401 and no session token.",
+          "req_type": "Hard",
+          "keywords": [
+            "shall"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-50319b17",
+          "notes": ""
+        }
+      ]
+    },
+    "procedural_no_keywords.docx": {
+      "count": 7,
+      "rows": [
+        {
+          "order": 1,
+          "source_file": "procedural_no_keywords.docx",
+          "row_ref": "Preamble",
+          "block_ref": "Paragraph",
+          "primary_actor": "",
+          "secondary_actors": [],
+          "text": "Written in indicative voice throughout — no shall / must / should / may.",
+          "req_type": "Hard",
+          "keywords": [
+            "may",
+            "must",
+            "shall",
+            "should"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-c0dab8d7",
+          "notes": ""
+        },
+        {
+          "order": 2,
+          "source_file": "procedural_no_keywords.docx",
+          "row_ref": "Preamble",
+          "block_ref": "Paragraph",
+          "primary_actor": "",
+          "secondary_actors": [],
+          "text": "Each row is a requirement by virtue of the Required action column header, not by virtue of any modal keyword in the sentence.",
+          "req_type": "Hard",
+          "keywords": [
+            "required"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-e569e154",
+          "notes": ""
+        },
+        {
+          "order": 3,
+          "source_file": "procedural_no_keywords.docx",
+          "row_ref": "Table 1, Row 2",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Operator",
+          "secondary_actors": [],
+          "text": "The Operator confirms the console lock status at the start of every shift.",
+          "req_type": "Hard",
+          "keywords": [
+            "(Required Action)"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-8b112daa",
+          "notes": ""
+        },
+        {
+          "order": 4,
+          "source_file": "procedural_no_keywords.docx",
+          "row_ref": "Table 1, Row 3",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Operator",
+          "secondary_actors": [],
+          "text": "The Operator reviews the previous shift's handover notes before touching any control surface.",
+          "req_type": "Hard",
+          "keywords": [
+            "(Required Action)"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-c82eddfb",
+          "notes": ""
+        },
+        {
+          "order": 5,
+          "source_file": "procedural_no_keywords.docx",
+          "row_ref": "Table 1, Row 4",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Supervisor",
+          "secondary_actors": [],
+          "text": "The Supervisor validates the active alarm list and acknowledges any outstanding items.",
+          "req_type": "Hard",
+          "keywords": [
+            "(Required Action)"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-1773feb4",
+          "notes": ""
+        },
+        {
+          "order": 6,
+          "source_file": "procedural_no_keywords.docx",
+          "row_ref": "Table 1, Row 5",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Supervisor",
+          "secondary_actors": [],
+          "text": "The Supervisor records the go/no-go decision for the shift in the shift log.",
+          "req_type": "Hard",
+          "keywords": [
+            "(Required Action)"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-4efb7117",
+          "notes": ""
+        },
+        {
+          "order": 7,
+          "source_file": "procedural_no_keywords.docx",
+          "row_ref": "Table 1, Row 6",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Operator",
+          "secondary_actors": [],
+          "text": "The Operator acknowledges the go decision and transitions the console to normal operating mode.",
+          "req_type": "Hard",
+          "keywords": [
+            "(Required Action)"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-e54c17aa",
+          "notes": ""
+        }
+      ]
+    },
+    "simple_two_actors.docx": {
+      "count": 4,
+      "rows": [
+        {
+          "order": 1,
+          "source_file": "simple_two_actors.docx",
+          "row_ref": "Table 1, Row 1",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Operator",
+          "secondary_actors": [],
+          "text": "The Operator shall log in to the control console and confirm the previous shift's handover notes.",
+          "req_type": "Hard",
+          "keywords": [
+            "shall"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-e9fab190",
+          "notes": ""
+        },
+        {
+          "order": 2,
+          "source_file": "simple_two_actors.docx",
+          "row_ref": "Table 1, Row 2",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Supervisor",
+          "secondary_actors": [],
+          "text": "The Supervisor must review the overnight alarm log before releasing the Operator to normal duties.",
+          "req_type": "Hard",
+          "keywords": [
+            "must"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-7b0e308a",
+          "notes": ""
+        },
+        {
+          "order": 3,
+          "source_file": "simple_two_actors.docx",
+          "row_ref": "Table 1, Row 3",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Operator",
+          "secondary_actors": [],
+          "text": "The Operator shall verify that all subsystem status indicators read nominal.",
+          "req_type": "Hard",
+          "keywords": [
+            "shall"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-ae91bf6c",
+          "notes": ""
+        },
+        {
+          "order": 4,
+          "source_file": "simple_two_actors.docx",
+          "row_ref": "Table 1, Row 4",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "Supervisor",
+          "secondary_actors": [],
+          "text": "The Supervisor must countersign the handover log once the checks are complete.",
+          "req_type": "Hard",
+          "keywords": [
+            "must"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-8af3bc67",
+          "notes": ""
+        }
+      ]
+    },
+    "compound/fixture_1_and_list.docx": {
+      "count": 1,
+      "rows": [
+        {
+          "order": 1,
+          "source_file": "fixture_1_and_list.docx",
+          "row_ref": "Table 1, Row 1",
+          "block_ref": "Paragraph 1 (compound)",
+          "primary_actor": "Program Office",
+          "secondary_actors": [],
+          "text": "Programs shall comply with this document if they (all of): (1) Domestic US-Based program; (2) exceed 12 months in duration; (3) Pre-preliminary design review <MRL 5 overall maturity; (4) design and/produce hardware content",
+          "req_type": "Hard",
+          "keywords": [
+            "shall"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-f4511f36",
+          "notes": "Compound requirement: lead-in + 4 and-joined item(s)."
+        }
+      ]
+    },
+    "compound/fixture_2_or_list.docx": {
+      "count": 1,
+      "rows": [
+        {
+          "order": 1,
+          "source_file": "fixture_2_or_list.docx",
+          "row_ref": "Table 1, Row 1",
+          "block_ref": "Paragraph 1 (compound)",
+          "primary_actor": "Operations",
+          "secondary_actors": [],
+          "text": "Operations must notify the on-call supervisor if any of the following occur (any of): (1) subsystem latency exceeds 200 ms; (2) error budget burn-rate doubles within a 5-minute window; (3) synthetic monitor returns a non-2xx response",
+          "req_type": "Hard",
+          "keywords": [
+            "must"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-b73ada62",
+          "notes": "Compound requirement: lead-in + 3 or-joined item(s)."
+        }
+      ]
+    },
+    "compound/fixture_3_mixed_markers.docx": {
+      "count": 2,
+      "rows": [
+        {
+          "order": 1,
+          "source_file": "fixture_3_mixed_markers.docx",
+          "row_ref": "Preamble",
+          "block_ref": "Paragraph",
+          "primary_actor": "",
+          "secondary_actors": [],
+          "text": "Both marker styles must be claimed by the same compound group.",
+          "req_type": "Hard",
+          "keywords": [
+            "must"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-4dd41f34",
+          "notes": ""
+        },
+        {
+          "order": 2,
+          "source_file": "fixture_3_mixed_markers.docx",
+          "row_ref": "Table 1, Row 1",
+          "block_ref": "Paragraph 1 (compound)",
+          "primary_actor": "Pilot",
+          "secondary_actors": [],
+          "text": "The Pilot shall complete the following pre-flight checks before takeoff (all of): (1) verify fuel reserves match the flight plan; (2) confirm all control surfaces respond freely; (3) test the radio handshake with ground control; (4) record the takeoff weight in the journey log",
+          "req_type": "Hard",
+          "keywords": [
+            "shall"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-0692d550",
+          "notes": "Compound requirement: lead-in + 4 and-joined item(s)."
+        }
+      ]
+    },
+    "compound/fixture_4_where_definitions.docx": {
+      "count": 2,
+      "rows": [
+        {
+          "order": 1,
+          "source_file": "fixture_4_where_definitions.docx",
+          "row_ref": "Preamble",
+          "block_ref": "Paragraph",
+          "primary_actor": "",
+          "secondary_actors": [],
+          "text": "The lead-in's last word is `where`, which the compound detector must treat as a definition block rather than an aggregated condition list.",
+          "req_type": "Hard",
+          "keywords": [
+            "must"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-75a27a3a",
+          "notes": ""
+        },
+        {
+          "order": 2,
+          "source_file": "fixture_4_where_definitions.docx",
+          "row_ref": "Table 1, Row 1",
+          "block_ref": "Paragraph 1",
+          "primary_actor": "System",
+          "secondary_actors": [],
+          "text": "The system shall enforce the throughput envelope T(x) where:",
+          "req_type": "Hard",
+          "keywords": [
+            "shall"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-4cd9f7fe",
+          "notes": ""
+        }
+      ]
+    },
+    "compound/fixture_5_unless_exclusion.docx": {
+      "count": 1,
+      "rows": [
+        {
+          "order": 1,
+          "source_file": "fixture_5_unless_exclusion.docx",
+          "row_ref": "Table 1, Row 1",
+          "block_ref": "Paragraph 1 (compound)",
+          "primary_actor": "Operations",
+          "secondary_actors": [],
+          "text": "Operations shall apply the patch within 24 hours of release unless (unless any of): (1) the change touches a regulated subsystem; (2) the maintenance window has been deferred by the Change Board; (3) an active incident covers the affected service",
+          "req_type": "Hard",
+          "keywords": [
+            "shall"
+          ],
+          "confidence": "High",
+          "polarity": "Positive",
+          "stable_id": "REQ-ccf8d99d",
+          "notes": "Compound requirement: lead-in + 3 unless-joined item(s)."
+        }
+      ]
+    }
+  }
+}

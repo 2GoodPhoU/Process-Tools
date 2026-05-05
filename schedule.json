@@ -1,5 +1,5 @@
 {
-  "_comment": "Static config. Do NOT register these tasks until Eva validation week clears (~2026-05-03). After that, ask Cowork to register via the scheduled-tasks MCP.",
+  "_comment": "Static config. Tasks registered with Cowork scheduled-tasks MCP on 2026-04-28 with IDs: process-tools-night-auditor, process-tools-researcher, process-tools-planner, process-tools-worker-{8am,9am,10am,11am,12pm}, process-tools-digest. To re-bootstrap, ask Cowork: 'Register the scheduled tasks defined in schedule.json.'",
   "project_name": "Process-Tools",
   "project_path": "C:\\Users\\erics\\Documents\\GitHub\\Process-Tools",
   "tasks": [

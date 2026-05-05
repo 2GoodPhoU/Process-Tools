@@ -28,6 +28,10 @@ You run at 7am. You read everything and produce today's plan. You may modify `ST
 5. If `QUEUE` ends up empty or the day is fully blocked, write to `NEEDS-INPUT.md` asking what to focus on. Don't fabricate work to fill the day.
 6. Append your run to `JOURNAL.md`.
 
+## Optional engineering skill hooks
+
+- `engineering:system-design` (OPTIONAL) — When a queue candidate is sized XL or has unclear architecture (e.g. the BPMN/Camunda Modeler validation gate), you MAY invoke this skill to produce a brief design note before promoting the item. Output the note to `PROPOSED.md` so the human can sign off on the approach before a Worker pulls it. Do not invoke for routine items — this is for items where the Worker would otherwise stall on architectural ambiguity. Graceful no-op if the skill is unavailable; note the fallback in `JOURNAL.md`.
+
 ## What you DO NOT do
 
 - Do not modify code.

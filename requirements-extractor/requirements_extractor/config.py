@@ -242,6 +242,101 @@ class ParserConfig:
 
 
 @dataclass
+class CompoundConfig:
+    """Compound-requirement detection (added in 0.6.1).
+
+    A modal-verb paragraph that ends with ``:`` and is followed by a
+    bulleted / dashed / numbered / lettered list is aggregated into a
+    single compound requirement (lead-in + items joined by their
+    inferred ``and`` / ``or`` / ``unless`` connector).  See
+    :mod:`requirements_extractor.compound` for the detection rules.
+
+    Default ON; flip to ``False`` in a per-run or per-doc YAML config
+    if a regression surfaces and the legacy per-paragraph behaviour
+    needs to come back without re-deploying the binary::
+
+        # ~/myproject.reqx.yaml
+        extraction:
+          compound:
+            enabled: false
+
+    Note: this flag is exposed under ``extraction.compound`` so the
+    naming reads naturally in YAML even though the dataclass section
+    name is ``compound``.  The :mod:`config` loader treats both
+    ``extraction.compound`` and a top-level ``compound`` key as
+    equivalent so users have either option.
+    """
+
+    enabled: bool = True
+
+
+@dataclass
+class MultiActionConfig:
+    """Multi-action requirement detection (added in 0.6.2).
+
+    A single sentence with one modal verb plus multiple verb phrases
+    joined by ``,`` ... ``, and`` (or ``, or``) is syntactically one
+    sentence but semantically expresses N atomic obligations.  This
+    section configures how the parser surfaces those.
+
+    Three modes:
+
+    * ``single`` — emit one requirement, preserve source text faithfully.
+      Behaviour-equivalent to 0.6.1.
+    * ``flag`` (default) — emit one requirement with reviewer-facing
+      metadata (count + recommendation in :attr:`Requirement.notes`).
+    * ``split`` — emit N atomic sub-requirements with hierarchical
+      sub-IDs (``REQ-042`` -> ``REQ-042.1`` / ``.2`` / ...).  Each
+      sub-requirement carries the same actor, modal, and source line/
+      page reference as its parent, plus :attr:`Requirement.parent_id`.
+
+    YAML form (either is accepted)::
+
+        # ~/myproject.reqx.yaml
+        extraction:
+          multi_action:
+            mode: split
+            min_actions: 2
+
+        # or flat:
+        multi_action:
+          mode: flag
+          enabled: true
+
+    Pipeline ordering: the multi-action pass runs AFTER the 0.6.1
+    compound aggregation, so a "shall create A, implement B, and
+    integrate C" sentence aggregated from a bulleted list (0.6.1) gets
+    decomposed (0.6.2) into 3 atomic sub-requirements when ``split``
+    mode is on.
+
+    Detection is GATED OFF inside ``force_requirement=True`` procedural
+    required-action tables (matching the 0.6.1 compound gate) — those
+    rows are atomic by virtue of the ``Required Action`` column header
+    semantics; splitting them would fragment what is already atomic.
+    """
+
+    mode: str = "flag"               # "single" | "flag" | "split"
+    enabled: bool = True
+    min_actions: int = 2
+
+    def __post_init__(self) -> None:
+        # Validate the mode value early so a typo in YAML doesn't
+        # silently fall through to legacy behaviour.  Allowed values
+        # match the three modes documented in the patch notes.
+        allowed = {"single", "flag", "split"}
+        if self.mode not in allowed:
+            raise ValueError(
+                f"multi_action.mode must be one of {sorted(allowed)} "
+                f"(got {self.mode!r})."
+            )
+        if self.min_actions < 2:
+            raise ValueError(
+                f"multi_action.min_actions must be >= 2 "
+                f"(got {self.min_actions})."
+            )
+
+
+@dataclass
 class Config:
     version: int = 1
     skip_sections: SkipSections = field(default_factory=SkipSections)
@@ -249,6 +344,8 @@ class Config:
     keywords: KeywordsConfig = field(default_factory=KeywordsConfig)
     content: ContentConfig = field(default_factory=ContentConfig)
     parser: ParserConfig = field(default_factory=ParserConfig)
+    compound: CompoundConfig = field(default_factory=CompoundConfig)
+    multi_action: MultiActionConfig = field(default_factory=MultiActionConfig)
 
     # Human-readable origin (file path or "default") — useful for logs.
     source: str = "default"
@@ -269,8 +366,18 @@ _TOP_LEVEL_SECTIONS = {
     "keywords": KeywordsConfig,
     "content": ContentConfig,
     "parser": ParserConfig,
+    "compound": CompoundConfig,
+    "multi_action": MultiActionConfig,
 }
-_ALLOWED_TOP_LEVEL_KEYS = set(_TOP_LEVEL_SECTIONS) | {"version"}
+# ``extraction`` is accepted as a *namespace* container at the top
+# level whose allowed nested keys are ``compound`` (added 0.6.1) and
+# ``multi_action`` (added 0.6.2).  This lets users write
+# ``extraction.compound.enabled`` / ``extraction.multi_action.mode`` —
+# the wording the patch notes document — AS WELL AS the flat
+# ``compound.enabled`` / ``multi_action.mode`` shape.  Both are
+# equivalent after :func:`_normalise_extraction_namespace` runs.
+_ALLOWED_TOP_LEVEL_KEYS = set(_TOP_LEVEL_SECTIONS) | {"version", "extraction"}
+_ALLOWED_UNDER_EXTRACTION = {"compound", "multi_action"}
 
 
 def load_config_raw(path: Path) -> Dict[str, Any]:
@@ -304,6 +411,57 @@ def load_config_raw(path: Path) -> Dict[str, Any]:
     return raw
 
 
+def _normalise_extraction_namespace(raw: Dict[str, Any]) -> Dict[str, Any]:
+    """Lift ``extraction.compound`` to top-level ``compound``.
+
+    The 0.6.1 patch notes describe the compound flag as
+    ``extraction.compound.enabled`` because that reads naturally in
+    YAML.  Internally though we keep one flat section per dataclass —
+    so this helper unfolds the ``extraction`` namespace into the flat
+    shape the rest of the loader expects, BEFORE schema validation
+    runs.
+
+    Behaviour:
+
+    * No ``extraction`` key  -> input returned unchanged.
+    * ``extraction.compound`` present -> merged into / overrides any
+      top-level ``compound`` key.  (Conflict resolution: the
+      ``extraction`` namespace wins, because the user explicitly
+      wrote it.)
+    * ``extraction`` keys other than ``compound`` -> raised as a
+      ``ValueError`` so the namespace doesn't silently absorb typos.
+
+    Returns a NEW dict; never mutates the input.
+    """
+    if "extraction" not in raw:
+        return raw
+    ext = raw.get("extraction")
+    if ext is None:
+        out = dict(raw)
+        out.pop("extraction", None)
+        return out
+    if not isinstance(ext, dict):
+        raise ValueError(
+            f"key 'extraction' must be a mapping "
+            f"(got {type(ext).__name__})."
+        )
+    unknown = set(ext.keys()) - _ALLOWED_UNDER_EXTRACTION
+    if unknown:
+        raise ValueError(
+            f"unknown keys under 'extraction': {sorted(unknown)}.  "
+            f"Allowed: {sorted(_ALLOWED_UNDER_EXTRACTION)}."
+        )
+    out = dict(raw)
+    out.pop("extraction")
+    # Lift each known sub-namespace key into its flat top-level form.
+    # Conflict resolution: ``extraction.<key>`` wins over a top-level
+    # ``<key>`` because the user explicitly wrote it as a namespace.
+    for key in _ALLOWED_UNDER_EXTRACTION:
+        if key in ext and ext[key] is not None:
+            out[key] = ext[key]
+    return out
+
+
 def _validate_raw(raw: Dict[str, Any], *, origin: str) -> None:
     """Reject unknown top-level or per-section keys early with a clear error."""
     unknown = set(raw.keys()) - _ALLOWED_TOP_LEVEL_KEYS
@@ -312,6 +470,11 @@ def _validate_raw(raw: Dict[str, Any], *, origin: str) -> None:
             f"{origin}: unknown top-level keys: {sorted(unknown)}.  "
             f"Allowed: {sorted(_ALLOWED_TOP_LEVEL_KEYS)}."
         )
+    if "extraction" in raw and raw["extraction"] is not None:
+        try:
+            _normalise_extraction_namespace(raw)
+        except ValueError as exc:
+            raise ValueError(f"{origin}: {exc}") from exc
     for key, cls in _TOP_LEVEL_SECTIONS.items():
         if key not in raw or raw[key] is None:
             continue
@@ -356,6 +519,10 @@ def build_config(raw: Optional[Dict[str, Any]] = None, *, source: str = "default
     Pass ``raw=None`` (or ``{}``) to get pure defaults.
     """
     raw = raw or {}
+    # Collapse the ``extraction.compound`` namespace before reading
+    # sections so callers that pass a raw dict directly (tests,
+    # programmatic users) get the same shape as YAML-loaded callers.
+    raw = _normalise_extraction_namespace(raw)
     kwargs: Dict[str, Any] = {"source": source}
     if "version" in raw:
         kwargs["version"] = int(raw["version"])
@@ -392,11 +559,11 @@ def resolve_config(
     Layers (each one overrides the one above):
       1. Dataclass defaults.
       2. Per-run config (``run_config_path``), if given.
-      3. Standalone keywords file (``keywords_path``), if given — a small
+      3. Standalone keywords file (``keywords_path``), if given - a small
          YAML with just the keyword knobs.  See :func:`load_keywords_raw`.
          Overrides the ``keywords:`` section of the per-run config only.
       4. Per-doc config (``<docstem>.reqx.yaml`` next to ``docx_path``),
-         if it exists — can override anything above.
+         if it exists - can override anything above.
 
     Returns a Config with ``source`` set to a ``+``-joined list of paths
     that actually contributed.
@@ -430,17 +597,7 @@ def resolve_config(
 
 
 # ---------------------------------------------------------------------------
-# Standalone keywords-file loader.
-#
-# The implementation lives in :mod:`keywords_loader` (extracted in a
-# refactor — config.py was bundling schema, validation, YAML loading, AND
-# keyword loading in one ~600-line file).  Re-exported here so existing
-# callers (CLI, GUI, tests) that did
-#
-#     from requirements_extractor.config import load_keywords_raw
-#
-# don't need to change their imports.  New code should prefer the direct
-# import from :mod:`keywords_loader`.
+# Standalone keywords-file loader (re-exported for backward compat).
 # ---------------------------------------------------------------------------
 
 from .keywords_loader import (  # noqa: E402, F401 — re-export for backward compat
@@ -448,7 +605,7 @@ from .keywords_loader import (  # noqa: E402, F401 — re-export for backward co
     load_keywords_raw,
 )
 
-# Legacy alias — the constant was named ``_KEYWORDS_FIELDS`` while it
+# Legacy alias - the constant was named ``_KEYWORDS_FIELDS`` while it
 # lived inside config.py.  Promoted to the public ``KEYWORDS_FIELDS``
 # name in keywords_loader.py; kept here as a private alias in case any
 # external code reached past the underscore.
