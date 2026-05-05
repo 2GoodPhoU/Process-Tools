@@ -27,9 +27,6 @@ Use `[in-progress]` instead of `[ ]` if a Worker started but couldn't finish (wi
 
 These two items have no open Eric gate and can be picked up by the next unattended Worker. Pull from this list before scanning the phase sections below.
 
-- 4.5 -- Draft `RELEASE-NOTES-1.0.md` scaffold at repo root (sub-tool sections empty; customer-facing tone). No content commitments yet -- the scaffold gives Phase 4 a target file.
-- 5.4 -- Draft DECISIONS.md CUSTOMER_HANDOFF retrospective entry stub (date placeholder, sub-tool versions placeholder, retrospective bullet stubs). Same logic: scaffold ahead of Phase 5 so the entry is ready to fill on tag day.
-
 ---
 
 ## Decomposed (Phase 2 -- Camunda migration)
