@@ -25,13 +25,13 @@ Use `[in-progress]` instead of `[ ]` if a Worker started but couldn't finish (wi
 
 ## Decomposed (next-pull-ready)
 
-These two items have no open Eric gate and can be picked up by the next unattended Worker. Pull from this list before scanning the phase sections below.
+(Empty after worker-8am 2026-05-06 closed 3.8. Awaiting next planner promotion.)
 
 ---
 
 ## Decomposed (Phase 2 -- Camunda migration)
 
-> Open phase. Item 2.5 (Camunda Modeler GUI gate) is the existing P1 [in-progress] entry at the top of this file -- B1/B2/B3 pending Eric. Items 2.1-2.4 are queued behind it; 2.1/2.2/2.4 also gated on the orphan-dir tracked-vs-ignored decision (3.7) because they touch `nimbus-skeleton/`.
+> Open phase. Item 2.5 (Camunda Modeler GUI gate) is the existing P1 [in-progress] entry at the top of this file -- B1/B2/B3 pending Eric. Items 2.1, 2.3, 2.4 are queued behind it; 2.1 + 2.4 also gated on the orphan-dir tracked-vs-ignored decision (3.7) because they touch `nimbus-skeleton/`. (2.2 closed worker-12pm 2026-05-05; samples/bpmn_validation/ is at repo root and not subject to the orphan-dir off-limits rule.)
 
 - [ ] [P1] [phase-2] [code-touching] 2.1 -- Add a stdlib BPMN structural-diff helper script for repeatable Camunda-resave round-trip checks.
   - DoD: `nimbus-skeleton/scripts/bpmn_structural_diff.py` (~50-80 LOC, pure stdlib `xml.etree.ElementTree`); takes two `.bpmn` files and prints (missing/added element ids, lane-membership deltas, sequence-flow source/target deltas, flow-node-without-shape count); 5 unit tests under `nimbus-skeleton/tests/test_bpmn_structural_diff.py`; suite goes from 40 to 45 green.
@@ -82,14 +82,8 @@ These two items have no open Eric gate and can be picked up by the next unattend
 - [ ] [P1] [phase-3] [arch] 3.7 -- Execute the orphan-dir tracked-vs-ignored decision (Option A status-quo / B formalize / C untrack) once Eric picks.
   - DoD per pick: (A) doc cleanup in CLAUDE.md, ACTION_ITEMS.md Phase-0, COMMIT_PLAN.md; off-limits rule lifted. (B) `pyproject.toml` + `README.md` per dir; PyInstaller spec re-validation; off-limits rule lifted. (C) full migration plan filed in PROPOSED, multi-shift.
   - Effort: A small (~30 min); B medium (~1 day); C large (multi-shift).
-  - Deps: Eric's pick (DECISIONS-orphan-dirs.md inputs filed 2026-04-29). Unblocks 2.1 / 2.2 / 2.3 / 2.4 + every Phase 4 item that touches the three dirs.
+  - Deps: Eric's pick (DECISIONS-orphan-dirs.md inputs filed 2026-04-29). Unblocks 2.1 / 2.3 / 2.4 + every Phase 4 item that touches the three dirs.
   - Skill: `engineering:system-design` (per planner role -- this is the architectural-ambiguity profile the skill targets; per cowork-session 2026-05-04 PROPOSED P2, this is one of the three pre-staged `[arch]` items).
-
-- [ ] [P2] [phase-3] [doc-only] 3.8 -- Once 0.6.1 + 0.6.2 patch lines land, refresh ROADMAP.md sub-tool status table.
-  - DoD: requirements-extractor row reads `0.6.2 (committed)` not `(Unreleased on disk)`; test counts updated if drifted; revision-history append.
-  - Effort: trivial (~10 min). Bundles into the same Worker shift that picks up 0.6.1/0.6.2.
-  - Deps: PROPOSED auditor 2026-04-29 commit-or-stash (must land first).
-  - Skill: `engineering:code-review`.
 
 ---
 
@@ -121,12 +115,6 @@ These two items have no open Eric gate and can be picked up by the next unattend
   - Deps: 3.7 (orphan-dir resolution); 4.1 + 4.2 + 4.3 (consumers cut first; the schema lib stabilises against committed consumers).
   - Skill: `engineering:system-design` (sys.path bootstrap removal touches packaging contract) -> `engineering:code-review`.
 
-- [ ] [P2] [phase-4] [doc-only] 4.5 -- Draft `RELEASE-NOTES-1.0.md` scaffold at repo root.
-  - DoD: file exists at root; one section per sub-tool; cross-references to per-tool CHANGELOGs; customer-facing tone (no "worker", "queue", or other automation jargon per CLAUDE.md operator voice).
-  - Effort: small (~1h scaffold; populate during 4.1-4.4 shifts).
-  - Deps: none for the scaffold (next-pull-ready); content fill depends on 4.1-4.4.
-  - Skill: `engineering:code-review` (doc-review).
-
 - [ ] [P2] [phase-4] [code-touching] 4.6 -- Build PyInstaller bundles for the customer-shipping subset; validate on Eric's restricted-network Windows machine.
   - DoD: `dist/DocumentDataExtractor.exe` produced clean (mandatory); nimbus-skeleton equivalent if customer needs offline BPMN emission (optional per ROADMAP.md Phase 4 exit); offline smoke-test green; bundle size + load time recorded in DECISIONS.md.
   - Effort: medium (~3-4h; build + restricted-network roundtrip is the slow part).
@@ -154,7 +142,7 @@ These two items have no open Eric gate and can be picked up by the next unattend
 - [ ] [P1] [phase-5] [attended] 5.2 -- Hand off the customer-deliverable bundle.
   - DoD: customer receives PyInstaller binaries + RELEASE-NOTES-1.0.md + per-tool READMEs + DDE samples; checksum or transfer receipt recorded in DECISIONS.md CUSTOMER_HANDOFF entry; bundle layout documented for re-build.
   - Effort: medium (~2-3h; depends on customer intake form).
-  - Deps: 5.1, 4.5 (release notes filled).
+  - Deps: 5.1, RELEASE-NOTES-1.0.md content filled (4.5 scaffolded by worker-10am 2026-05-05; populate during 4.1-4.4).
   - Skill: human attention.
 
 - [ ] [P2] [phase-5] [code-touching] 5.3 -- Open Unreleased sections for 1.1 work; seed ROADMAP.md post-1.0 section.

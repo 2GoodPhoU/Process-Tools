@@ -4,7 +4,7 @@
 draft. Operator voice. Anti-sprawl: this file replaces the prior ROADMAP.md
 rather than chaining a second one.
 
-**Last updated:** 2026-05-04.
+**Last updated:** 2026-05-06.
 
 ---
 
@@ -215,7 +215,7 @@ Each phase has entry and exit criteria. Exit criteria are observable
 
 | Sub-tool | Version | Tests | Phase 1 | Phase 2 | Phase 3 | Phase 4 |
 |---|---|---|---|---|---|---|
-| requirements-extractor | 0.6.2 (Unreleased on disk) | 606 | DONE since 0.5.0 | n/a | OPEN — 0.6.1/0.6.2 uncommitted | pending Phase 3 |
+| requirements-extractor | 0.6.2 (committed) | 606 | DONE since 0.5.0 | n/a | OPEN — 0.6.1/0.6.2 uncommitted | pending Phase 3 |
 | nimbus-skeleton | 0.1.0 + Unreleased BPMN | 40 | DONE | OPEN — Camunda GUI gate | clean | pending Phase 2 |
 | compliance-matrix | 0.1.0 + Unreleased fuzzy-id | 30 | DONE | n/a | clean | pending threshold tuning |
 | process-tools-common | 0.1.0 + Unreleased helpers | 26 | DONE | n/a | clean | pending Phase 3 |
@@ -340,3 +340,4 @@ worker chain stays empty-queue and Phase 2/3 do not advance.
   Camunda-as-de-facto-1.0) dropped. Phase 4 entry criteria simplified
   (v1.0-shape no longer an entry blocker). Tagged
   `[roadmap] bundle-v1-locked` in the journal.
+- **2026-05-06** — sub-tool status table refresh. requirements-extractor row updated from `0.6.2 (Unreleased on disk)` to `0.6.2 (committed)` after Eric's bundle commit `261a674` (2026-05-05) landed the 0.6.1 + 0.6.2 patch lines (compound.py + multi_action.py + tests + fixtures + baselines + parser + config + CHANGELOG + PATCH notes + .gitignore) in HEAD. Test totals unchanged at 702 (606 / 40 / 30 / 26) per auditor 2026-05-06 00:05. Closes QUEUE 3.8 (P2 [phase-3] [doc-only]).
