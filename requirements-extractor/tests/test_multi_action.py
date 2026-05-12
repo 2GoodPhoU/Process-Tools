@@ -317,6 +317,35 @@ class TestFixture4AfterCompoundAggregation(unittest.TestCase):
             )
             self.assertGreaterEqual(len(reqs), 1)
 
+    def test_split_mode_does_not_redecompose_compound_rows(self) -> None:
+        # 0.6.2 guard: when 0.6.1 has already aggregated a modal lead-in
+        # plus a bulleted list into one compound row, split mode must
+        # NOT re-decompose that synthetic text into sub-requirements.
+        # Pin: total row count under split == single, and no compound
+        # row spawns a child (parent_id stays empty).
+        single_reqs = _parse_with_mode(
+            "fixture_4_after_compound_aggregation.docx", "single"
+        )
+        split_reqs = _parse_with_mode(
+            "fixture_4_after_compound_aggregation.docx", "split"
+        )
+        self.assertEqual(len(split_reqs), len(single_reqs))
+        compound_parents = {
+            r.stable_id for r in split_reqs if "(compound)" in r.block_ref
+        }
+        # At least one compound row should exist in the fixture; if the
+        # fixture changes, this guard is the canary.
+        self.assertGreaterEqual(len(compound_parents), 1)
+        for r in split_reqs:
+            self.assertNotIn(
+                r.parent_id,
+                compound_parents,
+                msg=(
+                    "compound row %s was re-decomposed by split mode "
+                    "(child stable_id=%s)" % (r.parent_id, r.stable_id)
+                ),
+            )
+
 
 class TestFixture5InsideProceduralTable(unittest.TestCase):
     """Procedural required-action gate: split must be DISABLED."""

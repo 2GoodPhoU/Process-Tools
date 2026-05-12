@@ -324,6 +324,13 @@ def _apply_multi_action(
         # Procedural required-action gate - mirrors the 0.6.1 compound
         # gate.  See PATCH-0.6.2-NOTES.md for rationale.
         return [req]
+    if "(compound)" in (req.block_ref or ""):
+        # 0.6.1 compound aggregation already produced this row from a
+        # modal lead-in + bulleted list; the aggregated synthetic text
+        # routinely chains verb phrases ("X, Y, and Z") that 0.6.2's
+        # detector would re-split.  Re-decomposing here double-counts
+        # the same source obligations.  Keep compound rows atomic.
+        return [req]
     try:
         det = _multi_action.detect(
             req.text,
