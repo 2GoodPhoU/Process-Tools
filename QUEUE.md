@@ -39,11 +39,12 @@ Use `[in-progress]` instead of `[ ]` if a Worker started but couldn't finish (wi
   - Deps: 2.1 (helper script), 2.5 (GUI gate close), 3.7 (orphan-dir resolution).
   - Skill: `engineering:testing-strategy` -> `engineering:code-review`.
 
-- [ ] [P2] [phase-2] [code-touching] 2.4 -- Add an offline BPMN 2.0 XSD validation test (vendor the OMG XSD if obtainable air-gapped).
+- [in-progress] [P2] [phase-2] [code-touching] 2.4 -- Add an offline BPMN 2.0 XSD validation test (vendor the OMG XSD if obtainable air-gapped).
   - DoD: `nimbus-skeleton/tests/schemas/BPMN20.xsd` (or equivalent vendored copy; cite OMG release in comment); `test_bpmn_xsd_validation.py` parses emitter output and asserts schema-clean; suite +1-3 tests.
   - Effort: medium (~2-3h; XSD acquisition + dep-availability check is the slow part -- `xmlschema` is pure-Python and may already be in the bundle, otherwise consider `lxml` cost).
   - Deps: 3.7 (orphan-dir resolution); verify XSD distribution license is air-gap-friendly.
   - Skill: `engineering:system-design` (XSD vs structural-diff coverage tradeoff) -> `engineering:code-review`.
+  - Status (worker-11am 2026-05-12 11:00): worker-11am scoped the dep-availability check (lxml 6.0.2.0 installed / xmlschema not installed / tests dev-only / OMG release identified as 20100524 / 5 XSDs ~100KB) and bailed out per role-spec step 6 -- two open deps require Eric decision: validator library choice (D1) + OMG XSD vendor + license sign-off (D2) + dev-only scope confirmation (D3). See NEEDS-INPUT.md `[from: worker-11am / 2026-05-12 11:00]` entry. ETA ~1.5h from `[answered]` to DONE.
 
 - [in-progress] [P1] [phase-2] [attended] 2.5 -- Service the Camunda Modeler GUI gate (existing P1 [in-progress] above).
   - Tracked here only for phase-decomposition completeness. The canonical entry is the P1 [in-progress] at the top of this file. Status: option (a) chosen 2026-05-11 -- Eric runs the manual walkthrough; tracked as `[eric-action / 2026-05-11]` in NEEDS-INPUT.md. Manual-Gate lane.
