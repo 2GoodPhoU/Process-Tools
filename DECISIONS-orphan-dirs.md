@@ -1,5 +1,7 @@
 # Decision inputs — orphan dirs (`compliance-matrix/`, `nimbus-skeleton/`, `process-tools-common/`)
 
+> **DECISION (Eric, recorded 2026-05-11 cowork-session, effective 2026-05-05): Option A — keep tracked as proper packages.** No formalization (no `pyproject.toml` / packaging-metadata additions); no untracking. State already matches: all three dirs were tracked as of 2026-04-29 per section 2 below. Follow-up work is doc cleanup only — QUEUE 3.7 lifts the read-only off-limits rule in CLAUDE.md and corrects the stale "untracked" framing in `ACTION_ITEMS.md` Phase-0 + `COMMIT_PLAN.md`. CLAUDE.md / STATE.md "open question" language updated to "resolved 2026-05-05: kept tracked as proper packages" in the same cowork-session. The full options table in section 4 is retained for reference.
+
 > Compiled by process-tools-worker-10am, 2026-04-29. Read-only inspection. This document does NOT make the call. It assembles the inputs Eric needs to decide whether the three sibling top-level dirs should be tracked, ignored, or restructured.
 
 ## TL;DR — premise correction

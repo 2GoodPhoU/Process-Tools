@@ -33,12 +33,6 @@ Use `[in-progress]` instead of `[ ]` if a Worker started but couldn't finish (wi
 
 > Open phase. Item 2.5 (Camunda Modeler GUI gate) is the existing P1 [in-progress] entry at the top of this file -- B1/B2/B3 pending Eric. Items 2.1, 2.3, 2.4 are queued behind it; 2.1 + 2.4 also gated on the orphan-dir tracked-vs-ignored decision (3.7) because they touch `nimbus-skeleton/`. (2.2 closed worker-12pm 2026-05-05; samples/bpmn_validation/ is at repo root and not subject to the orphan-dir off-limits rule.)
 
-- [ ] [P1] [phase-2] [code-touching] 2.1 -- Add a stdlib BPMN structural-diff helper script for repeatable Camunda-resave round-trip checks.
-  - DoD: `nimbus-skeleton/scripts/bpmn_structural_diff.py` (~50-80 LOC, pure stdlib `xml.etree.ElementTree`); takes two `.bpmn` files and prints (missing/added element ids, lane-membership deltas, sequence-flow source/target deltas, flow-node-without-shape count); 5 unit tests under `nimbus-skeleton/tests/test_bpmn_structural_diff.py`; suite goes from 40 to 45 green.
-  - Effort: small (~1.5h, single shift).
-  - Deps: 3.7 orphan-dir resolution (touches `nimbus-skeleton/`); originated as PROPOSED researcher 2026-04-29 (P2).
-  - Skill: `engineering:system-design` (interchange-format design judgment) -> `engineering:code-review`.
-
 - [ ] [P1] [phase-2] [code-touching] 2.3 -- Capture the Camunda-saved BPMN as a regression fixture and add a structural-diff pin test against the original emitter output.
   - DoD: `nimbus-skeleton/tests/fixtures/simple_two_actors.camunda-saved.bpmn` checked in (post-2.5 capture); `tests/test_bpmn_camunda_roundtrip.py` adds 1-2 tests asserting structural-diff (via 2.1's helper) is empty between emitter output and Camunda-resave; suite +1-2 / 40+ green.
   - Effort: small (~1h, mostly fixture capture).
