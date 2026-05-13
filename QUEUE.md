@@ -20,12 +20,12 @@ Use `[in-progress]` instead of `[ ]` if a Worker started but couldn't finish (wi
   - Definition of done: emit a representative skeleton via the BPMN emitter, import into Camunda Modeler 5.x desktop, walk the section-2 table in `research/2026-04-29-camunda-import-checklist.md`, drag-drop into demo.bpmn.io, save in Camunda and structural-diff the saved file. Record findings (and any waiver removal) in `nimbus-skeleton/DECISIONS.md`.
   - Constraint: READ-ONLY against `nimbus-skeleton/` source. Emit BPMN artifacts to your run's scratch dir; record findings in `nimbus-skeleton/DECISIONS.md` (file may be created -- doc, not source). If the emitter run requires a code change to produce a clean import, stop and write to NEEDS-INPUT.md.
   - Computer-use waiver: CLAUDE.md "Task-specific waivers" authorizes Camunda Modeler 5.x desktop + Chrome MCP for demo.bpmn.io, scoped to this queue item only. Orphan-dirs read-only constraint still applies. Waiver self-sunsets when this item closes.
-  - Operational gap (worker-12pm 2026-04-30): unattended scheduled Workers cannot service `request_access` interactive approval dialogs. The 8am-12pm scheduled chain MUST skip this item. Eric's NEEDS-INPUT entry from 2026-04-30 12:00 captures three options to actually close: B1 attended Worker session (Eric kicks off ad-hoc), B2 Eric runs Option A himself (~15 min), B3 defer + drop [in-progress] (lowest cost; weakest gate).
+  - Status (2026-05-11 cowork-session): Eric picked **option (a) -- run the Camunda Modeler walkthrough manually himself** (equivalent to option B2). NEEDS-INPUT entry `[eric-action / 2026-05-11]` captures the open work (~15 min: open `samples/bpmn_validation/simple_two_actors.bpmn` in Camunda Modeler 5.x, walk the section-2 table in `research/2026-04-29-camunda-import-checklist.md`, drop into demo.bpmn.io, save + structural-diff, file findings in `nimbus-skeleton/DECISIONS.md`). The unattended `request_access` skip pattern still applies for any scheduled Worker -- this item closes when Eric completes the manual walk, not when a Worker picks it up.
   - Prior progress (worker-9am 2026-04-29): programmatic structural validation 24/24 PASS (`/tmp/bpmn_run/validate_bpmn_structural.py`); section-5 unittest pins 40/40 PASS in nimbus-skeleton; full pass/fail table in `research/2026-04-29-bpmn-structural-validation.md`. The remaining work is GUI-only.
 
 ## Decomposed (next-pull-ready)
 
-(Empty after worker-8am 2026-05-06 closed 3.8. Awaiting next planner promotion.)
+(Empty after worker-8am 2026-05-06 closed 3.8. Planner 2026-05-12 07:10 confirmed (post-pause re-sync, first planner after 2.5-day automation gap 2026-05-09 22:55 UTC -> 2026-05-12 04:00): 0 PROPOSED `[x]`-approved across the pause; nothing to promote. Highest-leverage pending Eric pick remains the `.git/index` thread (auditor 2026-04-30 P1 line 65 + auditor 2026-05-06 P1 line 153 + auditor 2026-05-07 RISKY P1 lines 160 + 167 + 174; researcher 2026-05-07 + 2026-05-08 + 2026-05-09 + 2026-05-12 validation) -- one `[x]` retires 5 entries spanning ~12 days.)
 
 ---
 
@@ -52,7 +52,7 @@ Use `[in-progress]` instead of `[ ]` if a Worker started but couldn't finish (wi
   - Skill: `engineering:system-design` (XSD vs structural-diff coverage tradeoff) -> `engineering:code-review`.
 
 - [in-progress] [P1] [phase-2] [attended] 2.5 -- Service the Camunda Modeler GUI gate (existing P1 [in-progress] above).
-  - Tracked here only for phase-decomposition completeness. The canonical entry is the P1 [in-progress] at the top of this file; B1/B2/B3 pending Eric per NEEDS-INPUT worker-12pm 2026-04-30. Manual-Gate lane.
+  - Tracked here only for phase-decomposition completeness. The canonical entry is the P1 [in-progress] at the top of this file. Status: option (a) chosen 2026-05-11 -- Eric runs the manual walkthrough; tracked as `[eric-action / 2026-05-11]` in NEEDS-INPUT.md. Manual-Gate lane.
   - Closure unblocks 2.3 + 4.2 (nimbus-skeleton 0.2.0 cut) + waiver removal in CLAUDE.md.
 
 ---
@@ -78,12 +78,6 @@ Use `[in-progress]` instead of `[ ]` if a Worker started but couldn't finish (wi
   - Effort: small (~1h bash edit + Windows verify).
   - Deps: PROPOSED night-auditor 2026-04-29 (P2 NUL-byte sweep) + PROPOSED night-auditor 2026-04-29 (P2 Windows hook). Bundle both into one commit.
   - Skill: `engineering:code-review`.
-
-- [ ] [P1] [phase-3] [arch] 3.7 -- Execute the orphan-dir tracked-vs-ignored decision (Option A status-quo / B formalize / C untrack) once Eric picks.
-  - DoD per pick: (A) doc cleanup in CLAUDE.md, ACTION_ITEMS.md Phase-0, COMMIT_PLAN.md; off-limits rule lifted. (B) `pyproject.toml` + `README.md` per dir; PyInstaller spec re-validation; off-limits rule lifted. (C) full migration plan filed in PROPOSED, multi-shift.
-  - Effort: A small (~30 min); B medium (~1 day); C large (multi-shift).
-  - Deps: Eric's pick (DECISIONS-orphan-dirs.md inputs filed 2026-04-29). Unblocks 2.1 / 2.3 / 2.4 + every Phase 4 item that touches the three dirs.
-  - Skill: `engineering:system-design` (per planner role -- this is the architectural-ambiguity profile the skill targets; per cowork-session 2026-05-04 PROPOSED P2, this is one of the three pre-staged `[arch]` items).
 
 ---
 

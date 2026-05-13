@@ -1,8 +1,11 @@
 # Suggested commit plan -- 2026-04-25 (refreshed post-execution)
 
+> **Status (2026-05-12, QUEUE 3.7 doc-alignment closure):** HISTORICAL — the nine commits below were authored 2026-04-25 and have since been fully executed (see `git log` between 2026-04-25 and the present). The "Current working-tree state" snapshot and the commit grouping are retained as record-keeping; do NOT re-execute. The Phase 0 correction at the top remains accurate context. Eric formally resolved the orphan-dir tracked-vs-ignored question on 2026-05-05 as Option A — kept tracked as proper packages, per `DECISIONS-orphan-dirs.md`.
+
 The working tree has grown substantially since the original draft.
-This document supersedes the earlier version. Execute on your end;
-nothing here has been git-staged or committed.
+This document supersedes the earlier version. The instructions below
+("Execute on your end") describe the 2026-04-25 state of play and are
+retained verbatim for record-keeping only — see the status banner above.
 
 ## ACTION_ITEMS Phase 0 -- RESOLVED, doc is stale
 

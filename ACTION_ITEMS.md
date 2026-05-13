@@ -27,7 +27,7 @@ overnight session.
 
 **Highest-leverage item this pass:** `nimbus-skeleton` BPMN 2.0 XML emitter. Triggered by the alternatives-survey finding that TIBCO Nimbus on-prem retired Sept 1, 2025 — BPMN 2.0 is the recommended interchange path forward.
 
-**Biggest concern surfaced:** the `compliance-matrix/`, `nimbus-skeleton/`, and `process-tools-common/` directories are **entirely untracked in git** with no nested `.git/` and no `.gitignore` rule excluding them. This is most likely "never `git add`-ed yet", not "intentionally separate repos". Eric should decide what to do (see below).
+**Biggest concern surfaced (HISTORICAL — RESOLVED 2026-04-25 / 2026-05-05):** the `compliance-matrix/`, `nimbus-skeleton/`, and `process-tools-common/` directories were flagged as **entirely untracked in git** at the time of writing. As of 2026-04-25 evening they were already tracked in git (`76b4993`, `aac5728`, the `cfc8ef7` series); the doc was the stale piece. Eric formally resolved the tracked-vs-ignored question on 2026-05-05 as **Option A — kept tracked as proper packages** (see `DECISIONS-orphan-dirs.md`). QUEUE 3.7 doc-alignment closure (worker-8am 2026-05-12) lifted the read-only off-limits constraint that had been in place pending this cleanup.
 
 ---
 
@@ -155,7 +155,7 @@ These shipped earlier tonight and remain valid. Re-checked: all listed files pre
 
 ## Morning TODO (Eric, est. 5–10 min)
 
-1. **Decide git tracking** for `compliance-matrix/`, `nimbus-skeleton/`, `process-tools-common/`. Either `git add` them or add them to `.gitignore`. Right now they're orphaned in the working tree.
+1. ~~**Decide git tracking** for `compliance-matrix/`, `nimbus-skeleton/`, `process-tools-common/`. Either `git add` them or add them to `.gitignore`. Right now they're orphaned in the working tree.~~ **RESOLVED 2026-05-05.** All three were already tracked as of 2026-04-29; Eric chose Option A (kept tracked as proper packages) on 2026-05-05 per `DECISIONS-orphan-dirs.md`. QUEUE 3.7 closed 2026-05-12 by worker-8am.
 2. **Spot-check the BPMN output** by running:
    `cd nimbus-skeleton && python run_cli.py --requirements <a real REQS.xlsx> --output-dir /tmp/bpmn-test --bpmn`
    then opening the resulting `.bpmn` in Camunda Modeler ([https://camunda.com/download/modeler/](https://camunda.com/download/modeler/)) or bpmn.io. Goal: confirm the tool you'd actually use can read it.

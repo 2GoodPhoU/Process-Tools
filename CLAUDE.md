@@ -15,13 +15,12 @@ Python 3.x, PyInstaller offline-bundle (with `collect_all` for spacy + en_core_w
 - Do not introduce network-dependent code in shipped binary paths — air-gapped target.
 - Do not modify archived `PLAN-*.md` files in `requirements-extractor/archive/` — historical reference.
 - Do not break the BPMN 2.0 emitter — Nimbus retired Sept 2025; this is the migration path.
-- Do not modify the three sibling top-level dirs (`compliance-matrix/`, `nimbus-skeleton/`, `process-tools-common/`) until tracked-vs-ignored is decided (currently untracked — see `ACTION_ITEMS.md` Phase 0 finding).
 - Push policy (updated 2026-05-04): a local commit is sufficient to satisfy DoD and mark a queue item DONE. Remote pushes from automation are INFORMATIONAL — workers may attempt a push to a working branch via the GitHub MCP; if it fails or the MCP is unavailable, the worker journals "remote push deferred — Eric pushes nightly" and proceeds. Eric pushes manually each evening; automation is not the system of record for remote state. Bans still in force: no direct pushes to `main`/`master`, no force-pushes, no history rewrites.
 - Do not register scheduled tasks during Eva validation week (active through ~2026-05-03).
 
 ## Task-specific waivers
 
-- **BPMN/Camunda GUI validation** (QUEUE.md P1, "Validate the new BPMN 2.0 emitter output against Camunda Modeler's import"): Worker may use computer-use for Camunda Modeler 5.x desktop and the Chrome MCP for demo.bpmn.io. Scope: this queue item ONLY -- not a general capability grant. Read-only against orphan-dirs (`compliance-matrix/`, `nimbus-skeleton/`, `process-tools-common/`) still applies; emitter artifacts go to the run's scratch dir, findings to `nimbus-skeleton/DECISIONS.md` (doc, not source). Approved by Eric 2026-04-30. Remove this waiver after the queue item closes.
+- **BPMN/Camunda GUI validation** (QUEUE.md P1, "Validate the new BPMN 2.0 emitter output against Camunda Modeler's import"): Worker may use computer-use for Camunda Modeler 5.x desktop and the Chrome MCP for demo.bpmn.io. Scope: this queue item ONLY -- not a general capability grant. Emitter artifacts go to the run's scratch dir; findings recorded in `nimbus-skeleton/DECISIONS.md` (doc, not source) -- no source-file changes to `nimbus-skeleton/` as part of the waiver. Approved by Eric 2026-04-30. Remove this waiver after the queue item closes.
 
 ## Definition of done (project-wide)
 
@@ -34,7 +33,7 @@ Python 3.x, PyInstaller offline-bundle (with `collect_all` for spacy + en_core_w
 ## Project-specific notes
 
 - Formal v1.0 roadmap lives at `ROADMAP.md` (last refresh 2026-05-04, [roadmap] bundle-v1-locked) — Camunda GUI gate is the single biggest open item. **v1.0 shape: bundle.** All four sub-tools tag at 1.0 together as a single customer deliverable; confirmed by Eric 2026-05-04. Per-sub-tool / customer-deliverable-only / Camunda-as-de-facto-1.0 alternatives are dropped.
-- Three sibling top-level dirs (`compliance-matrix`, `nimbus-skeleton`, `process-tools-common`) are entirely untracked in git as of 2026-04-26 — Eric to decide tracked-vs-ignored before more code lands.
+- Three sibling top-level dirs (`compliance-matrix`, `nimbus-skeleton`, `process-tools-common`): tracked-vs-ignored decision resolved 2026-05-05 — kept tracked as proper packages (option A from `DECISIONS-orphan-dirs.md`). All three were already tracked as of 2026-04-29; the pre-2026-04-29 "entirely untracked" framing in legacy docs (`ACTION_ITEMS.md` Phase 0, `COMMIT_PLAN.md`) was always stale. QUEUE 3.7 doc-alignment closed by worker-8am 2026-05-12; the prior read-only off-limits constraint is lifted.
 - BPMN 2.0 emitter just shipped on `nimbus-skeleton`; next gate is Camunda Modeler import validation (the current focus).
 - Rule-based actor-extraction fallback (10 heuristics: passive-by-agent, send-to, possessive, compound subject, conditional subject, for-beneficiary, implicit-passive, hyphenated role, between-X-and-Y, role appositive) is the offline-network load-bearing layer. Any heuristic change should be regression-tested.
 - Edit-tool truncation is a recurring hazard — verify file contents post-edit, especially for `cli.py` and `actors.py`.
