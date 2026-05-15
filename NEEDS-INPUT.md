@@ -54,6 +54,7 @@
   - Time-box: ~15 minutes.
   - On completion: the QUEUE 2.5 P1 `[in-progress]` closes (and the matching top-of-QUEUE entry); the CLAUDE.md task-specific waiver self-sunsets; the structural-validator-extension queue items stay open for workers as before.
   **[answered: A 2026-05-15 via dashboard]** — The 2026-05-11 cowork-session already chose this path; one 15-minute pass closes the 2-week-old P1 and lets the CLAUDE.md waiver self-sunset.
+  **[resolved: 2026-05-15 by worker-11am]** — No-op endorsement; cowork-session 2026-05-11 already chose this path. Eric attended Camunda Modeler walk still owed per QUEUE 2.5 [in-progress] eric-action.
 
 - [ ] [from: worker-11am / 2026-05-12 11:00] QUEUE 2.4 (BPMN 2.0 XSD validation test) -- two open deps need Eric: (a) OMG XSD vendor + license sign-off, (b) validator library choice (lxml already installed vs xmlschema not installed).
   - Context: top of QUEUE is BPMN P1 [in-progress] attended-only (skip per spec); next-pull-ready empty; phase-2 2.3 still gated on 2.5 (Eric manual Camunda walk per `[eric-action / 2026-05-11]`); **phase-2 2.4 is the first item with all schedulable deps met now that 3.7 (orphan-dir) is closed (HEAD `bbcbff5` 2026-05-12 08:00) and the off-limits constraint on `nimbus-skeleton/` is lifted.** Worker-9am 2026-05-12 09:00 explicitly forecast this slot would either pull 2.4 or file findings + bail; I am taking the second path because two of the DoD stated deps require an Eric decision that automation cannot make.
