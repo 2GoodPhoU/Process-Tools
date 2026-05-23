@@ -16,35 +16,49 @@ Use `[in-progress]` instead of `[ ]` if a Worker started but couldn't finish (wi
 
 ---
 
+## Manual-Gate / eric-action
+
+> Items requiring Eric attended action (not Worker-pickable). Scheduled Workers skip per `roles/worker.md` step 2 -- the dashboard answer-resolution contract is the route to closure. Promotion of new items here requires either a dashboard `**[answered:]**` marker on a NEEDS-INPUT question OR a PROPOSED `[x]`-approval.
+
+- [in-progress] [P1] [manual-gate / eric-action] Refresh `.git/index` from HEAD -- one Windows-side command retires the 8-day chronic stale-index state.
+  - Status: promoted by planner 2026-05-15 07:10 from PROPOSED line 65 (auditor 2026-04-30 P1) + 4 successor entries (auditor 2026-05-06 P1 line 153 + auditor 2026-05-07 RISKY P1 lines 160 + 167 + RISKY P2 line 174). Promotion ground: NEEDS-INPUT line 36 `**[answered: B 2026-05-15 via dashboard]**` -- Eric approved "promoting the two P1 blocking-adjacent items"; one of the two (commit-or-stash 0.6.1/0.6.2) was already DONE by `261a674` 2026-05-05 so is moot; this entry covers the other (`.git/index` recovery).
+  - Definition of done: from a Windows-side shell at the repo root, run `rm -f .git/index .git/index.lock && git read-tree HEAD`. Verify `git fsck --no-progress` exits 0 and `git ls-files -u` is empty. Verify `git status -s` no longer shows the staged-delete `D  RELEASE-NOTES-1.0.md` nor the `D  nimbus-skeleton/scripts/bpmn_structural_diff.py` + `D  nimbus-skeleton/tests/test_bpmn_structural_diff.py` ghost-delete entries (joined by the legitimate working-tree edits + untracked items). File a one-line DECISIONS.md entry (decision-doc voice) citing the recovery.
+  - Why Eric-only: `.git/index.lock` (0-byte sentinel, mtime 2026-05-07 06:07:44 UTC) is held by a Windows-side process; Linux workspace bash returns `Operation not permitted` on `unlink('.git/index.lock')`. Scheduled Workers running on the Linux side cannot release the lock.
+  - Time-box: ~2 minutes attended.
+  - On completion: 5 grouped PROPOSED entries retire (lines 65 / 153 / 160 / 167 / 174 -- mark `[resolved by Eric 2026-05-15-or-later]` in evening review); destructive staged-delete data-loss vector on `RELEASE-NOTES-1.0.md` retires; 2 invisible-new-files from `9ca814d` stop surfacing as `??` in `git status -s`; vanilla `git commit -a` becomes safe again. The Workers' `GIT_INDEX_FILE=/tmp/...` plumbing-path workaround stays available as a fallback but is no longer load-bearing.
+  - Follow-up note for researcher: forensic signal on the 2026-05-06 trailer-SHA1 mismatch decays as soon as `git status` re-stats the new index. If R1 (post-fix retro) is still wanted, researcher 2026-05-16 04:00 should run it the night of the recovery, not later.
+
+---
+
 - [in-progress] [P1] Validate the new BPMN 2.0 emitter output against Camunda Modeler's import. **REQUIRES ATTENDED WORKER ONLY -- scheduled Workers must skip.**
   - Definition of done: emit a representative skeleton via the BPMN emitter, import into Camunda Modeler 5.x desktop, walk the section-2 table in `research/2026-04-29-camunda-import-checklist.md`, drag-drop into demo.bpmn.io, save in Camunda and structural-diff the saved file. Record findings (and any waiver removal) in `nimbus-skeleton/DECISIONS.md`.
   - Constraint: READ-ONLY against `nimbus-skeleton/` source. Emit BPMN artifacts to your run's scratch dir; record findings in `nimbus-skeleton/DECISIONS.md` (file may be created -- doc, not source). If the emitter run requires a code change to produce a clean import, stop and write to NEEDS-INPUT.md.
   - Computer-use waiver: CLAUDE.md "Task-specific waivers" authorizes Camunda Modeler 5.x desktop + Chrome MCP for demo.bpmn.io, scoped to this queue item only. Orphan-dirs read-only constraint still applies. Waiver self-sunsets when this item closes.
-  - Status (2026-05-11 cowork-session): Eric picked **option (a) -- run the Camunda Modeler walkthrough manually himself** (equivalent to option B2). NEEDS-INPUT entry `[eric-action / 2026-05-11]` captures the open work (~15 min: open `samples/bpmn_validation/simple_two_actors.bpmn` in Camunda Modeler 5.x, walk the section-2 table in `research/2026-04-29-camunda-import-checklist.md`, drop into demo.bpmn.io, save + structural-diff, file findings in `nimbus-skeleton/DECISIONS.md`). The unattended `request_access` skip pattern still applies for any scheduled Worker -- this item closes when Eric completes the manual walk, not when a Worker picks it up.
+  - Status (2026-05-11 cowork-session): Eric picked **option (a) -- run the Camunda Modeler walkthrough manually himself** (equivalent to option B2). NEEDS-INPUT entry `[eric-action / 2026-05-11]` captures the open work (~15 min: open `samples/bpmn_validation/simple_two_actors.bpmn` in Camunda Modeler 5.x, walk the section-2 table in `research/2026-04-29-camunda-import-checklist.md`, drop into demo.bpmn.io, save + structural-diff, file findings in `nimbus-skeleton/DECISIONS.md`). The unattended `request_access` skip pattern still applies for any scheduled Worker -- this item closes when Eric completes the manual walk, not when a Worker picks it up. **New helper available 2026-05-12**: `nimbus-skeleton/scripts/bpmn_structural_diff.py` (worker-9am `9ca814d` / QUEUE 2.1) -- run `python3 nimbus-skeleton/scripts/bpmn_structural_diff.py <emitter-output.bpmn> <camunda-resaved.bpmn>` for step 4 of the walk; returns 0 on equivalent / 1 on delta; format_report() prints the per-dimension delta if non-empty.
   - Prior progress (worker-9am 2026-04-29): programmatic structural validation 24/24 PASS (`/tmp/bpmn_run/validate_bpmn_structural.py`); section-5 unittest pins 40/40 PASS in nimbus-skeleton; full pass/fail table in `research/2026-04-29-bpmn-structural-validation.md`. The remaining work is GUI-only.
 
 ## Decomposed (next-pull-ready)
 
-(Empty after worker-8am 2026-05-06 closed 3.8. Planner 2026-05-12 07:10 confirmed (post-pause re-sync, first planner after 2.5-day automation gap 2026-05-09 22:55 UTC -> 2026-05-12 04:00): 0 PROPOSED `[x]`-approved across the pause; nothing to promote. Highest-leverage pending Eric pick remains the `.git/index` thread (auditor 2026-04-30 P1 line 65 + auditor 2026-05-06 P1 line 153 + auditor 2026-05-07 RISKY P1 lines 160 + 167 + 174; researcher 2026-05-07 + 2026-05-08 + 2026-05-09 + 2026-05-12 validation) -- one `[x]` retires 5 entries spanning ~12 days.)
+(Today's pull priority is NONE -- the dashboard-marker queue is structurally EMPTY (5/5 paired AND VERIFIED). Worker-8am 2026-05-16 14:12 paired the 5th marker (line 73/74 partial-acceptance: D1=`lxml` accepted; D2 OMG XSD vendor + D3 dev-only confirm still open on parent worker-11am 2026-05-12 entry; QUEUE 2.4 stays `[in-progress]`) via plumbing-path commit `d1500e17`. Night-auditor 2026-05-17 02:12 VERIFIED the pair byte-exact + emitted `logs/process-tools/2026-05-17.jsonl` (1 entry); the 4 prior 2026-05-15-overnight pairs were VERIFIED 2026-05-16 00:10 in `logs/process-tools/2026-05-16.jsonl`. **No unpaired dashboard markers; no next-pull-ready phase-decomposed items; 0 of 34 PROPOSED entries are `[x]`-approved.** Per `roles/worker.md` step 2 + planner role-spec point 5, the 8am-12pm Worker chain today expects empty-queue bailout absent Eric `[x]`-action during evening review. Highest-leverage Eric `[x]` candidates per researcher 2026-05-17 R5 freshness audit (`research/2026-05-17-proposed-backlog-freshness-audit.md`): (a) cowork-session 2026-05-04 P1 numeric-fact auto-update authorization (PROPOSED line 121; retires line 59 by side-effect); (b) researcher 2026-05-14 Pre-Phase-4 readiness 5-sub-item bundle (PROPOSED line 210); (c) researcher 2026-05-13 D2/D3 OMG XSD vendor + dev-only confirm bundle (PROPOSED line 195; D1 already partial-resolved); (d) pair-approve `.gitignore` patches (PROPOSED lines 181 + 203). Remaining unblocks are the two Manual-Gate eric-action items (`.git/index` recovery + Camunda walk; both eric-attended). Wall-clock anomaly day-6; root cause grounded per `research/2026-05-16-wall-clock-fire-time-analysis.md` = Eric-machine sleep + Cowork scheduler-replay; benign as long as bailouts stay clean.)
 
 ---
 
 ## Decomposed (Phase 2 -- Camunda migration)
 
-> Open phase. Item 2.5 (Camunda Modeler GUI gate) is the existing P1 [in-progress] entry at the top of this file -- B1/B2/B3 pending Eric. Items 2.1, 2.3, 2.4 are queued behind it; 2.1 + 2.4 also gated on the orphan-dir tracked-vs-ignored decision (3.7) because they touch `nimbus-skeleton/`. (2.2 closed worker-12pm 2026-05-05; samples/bpmn_validation/ is at repo root and not subject to the orphan-dir off-limits rule.)
+> Open phase. Item 2.5 (Camunda Modeler GUI gate) is the existing P1 [in-progress] entry at the top of this file -- waiting on Eric manual walk per `[eric-action / 2026-05-11]`. Items 2.3, 2.4 are queued behind it; 2.4 is now `[in-progress]` waiting on Eric D1/D2/D3 (researcher 2026-05-13 PROPOSED bundle ready for one-click `[x]`). Off-limits constraint on `nimbus-skeleton/` was **lifted 2026-05-12** by `bbcbff5` (QUEUE 3.7 doc-alignment closure). (2.1 closed worker-9am 2026-05-12 `9ca814d`; 2.2 closed worker-12pm 2026-05-05; samples/bpmn_validation/ is at repo root and was never subject to the orphan-dir off-limits rule.)
 
 - [ ] [P1] [phase-2] [code-touching] 2.3 -- Capture the Camunda-saved BPMN as a regression fixture and add a structural-diff pin test against the original emitter output.
   - DoD: `nimbus-skeleton/tests/fixtures/simple_two_actors.camunda-saved.bpmn` checked in (post-2.5 capture); `tests/test_bpmn_camunda_roundtrip.py` adds 1-2 tests asserting structural-diff (via 2.1's helper) is empty between emitter output and Camunda-resave; suite +1-2 / 40+ green.
   - Effort: small (~1h, mostly fixture capture).
-  - Deps: 2.1 (helper script), 2.5 (GUI gate close), 3.7 (orphan-dir resolution).
+  - Deps: 2.5 (GUI gate close). 2.1 helper script DONE 2026-05-12 (`9ca814d`); 3.7 orphan-dir DONE 2026-05-12 (`bbcbff5`).
   - Skill: `engineering:testing-strategy` -> `engineering:code-review`.
 
 - [in-progress] [P2] [phase-2] [code-touching] 2.4 -- Add an offline BPMN 2.0 XSD validation test (vendor the OMG XSD if obtainable air-gapped).
   - DoD: `nimbus-skeleton/tests/schemas/BPMN20.xsd` (or equivalent vendored copy; cite OMG release in comment); `test_bpmn_xsd_validation.py` parses emitter output and asserts schema-clean; suite +1-3 tests.
   - Effort: medium (~2-3h; XSD acquisition + dep-availability check is the slow part -- `xmlschema` is pure-Python and may already be in the bundle, otherwise consider `lxml` cost).
-  - Deps: 3.7 (orphan-dir resolution); verify XSD distribution license is air-gap-friendly.
+  - Deps: NONE remaining (3.7 orphan-dir DONE 2026-05-12 `bbcbff5`; XSD license/strictness research DONE 2026-05-13 `research/2026-05-13-bpmn-xsd-validator-and-license.md`). Ready to start on Eric `[x]` of researcher 2026-05-13 PROPOSED bundle.
   - Skill: `engineering:system-design` (XSD vs structural-diff coverage tradeoff) -> `engineering:code-review`.
-  - Status (worker-11am 2026-05-12 11:00): worker-11am scoped the dep-availability check (lxml 6.0.2.0 installed / xmlschema not installed / tests dev-only / OMG release identified as 20100524 / 5 XSDs ~100KB) and bailed out per role-spec step 6 -- two open deps require Eric decision: validator library choice (D1) + OMG XSD vendor + license sign-off (D2) + dev-only scope confirmation (D3). See NEEDS-INPUT.md `[from: worker-11am / 2026-05-12 11:00]` entry. ETA ~1.5h from `[answered]` to DONE.
+  - Status (worker-11am 2026-05-12 11:00 + researcher 2026-05-13 04:00): worker-11am scoped the dep-availability check (lxml 6.0.2.0 installed / xmlschema not installed / tests dev-only / OMG release identified as 20100524 / 5 XSDs ~100KB) and bailed per role-spec step 6 -- D1/D2/D3 NEEDS-INPUT entry filed. Researcher 2026-05-13 04:00 filed `research/2026-05-13-bpmn-xsd-validator-and-license.md` (~15.7 KB) + ONE PROPOSED P2 bundling D1+D2+D3 (D1->xmlschema for strictness; D2->OK-to-vendor 5 XSDs with sibling SCHEMAS-LICENSE.md; D3->confirmed dev-only) so Eric can one-click `[x]` instead of answering three NEEDS-INPUT lines. ETA ~1.5-2h from `[x]` to DONE; 8-step Worker spec attached to the PROPOSED entry. Failure-mode pre-flagged: if xmlschema rejects existing fixture, treat as emitter spec-gap signal (not setup bug).
 
 - [in-progress] [P1] [phase-2] [attended] 2.5 -- Service the Camunda Modeler GUI gate (existing P1 [in-progress] above).
   - Tracked here only for phase-decomposition completeness. The canonical entry is the P1 [in-progress] at the top of this file. Status: option (a) chosen 2026-05-11 -- Eric runs the manual walkthrough; tracked as `[eric-action / 2026-05-11]` in NEEDS-INPUT.md. Manual-Gate lane.
@@ -89,25 +103,25 @@ Use `[in-progress]` instead of `[ ]` if a Worker started but couldn't finish (wi
 - [ ] [P2] [phase-4] [code-touching] 4.2 -- Promote `nimbus-skeleton/CHANGELOG.md` Unreleased -> dated `[0.2.0]` entry; bump version; one focused commit.
   - DoD: CHANGELOG date + `[0.2.0]` heading; BPMN + review-writer + shared-loader sections retained; tests still 40 green; emitter output validates against Camunda Modeler 5.x (per 2.5).
   - Effort: small (~30 min).
-  - Deps: 2.5 (Camunda gate); 3.7 (orphan-dir resolution).
+  - Deps: 2.5 (Camunda gate). 3.7 orphan-dir DONE 2026-05-12 (`bbcbff5`).
   - Skill: `engineering:code-review`.
 
 - [ ] [P2] [phase-4] [code-touching] 4.3 -- Promote `compliance-matrix/CHANGELOG.md` Unreleased -> dated `[0.2.0]` entry; bump version.
   - DoD: CHANGELOG date + `[0.2.0]` heading; fuzzy-id matcher + shared-loader retained; tests still 30 green; default thresholds (similarity 0.20 / keyword 0.15 / fuzzy_id 0.85) validated against one real spec/procedure pair per ROADMAP.md 1.0 criteria.
   - Effort: small if thresholds already validated (~30 min); medium if validation has to be done this shift (~3-4h).
-  - Deps: 3.7 (orphan-dir resolution); threshold validation against real spec.
+  - Deps: threshold validation against real spec. 3.7 orphan-dir DONE 2026-05-12 (`bbcbff5`).
   - Skill: `engineering:testing-strategy` for threshold validation -> `engineering:code-review`.
 
 - [ ] [P2] [phase-4] [code-touching] 4.4 -- Promote `process-tools-common/CHANGELOG.md` Unreleased -> dated `[0.2.0]` entry; bump version; verify both consumers install without `sys.path` bootstrap.
   - DoD: CHANGELOG date + `[0.2.0]` heading; cli_helpers + dde_xlsx loader helpers retained; tests still 26 green; consumers (compliance-matrix + nimbus-skeleton) pip-install or PyInstaller-bundle cleanly without the `sys.path` bootstrap shim per ROADMAP.md 1.0 criteria.
   - Effort: medium (~2h; bootstrap-removal verification is the load-bearing step).
-  - Deps: 3.7 (orphan-dir resolution); 4.1 + 4.2 + 4.3 (consumers cut first; the schema lib stabilises against committed consumers).
+  - Deps: 4.1 + 4.2 + 4.3 (consumers cut first; the schema lib stabilises against committed consumers). 3.7 orphan-dir DONE 2026-05-12 (`bbcbff5`).
   - Skill: `engineering:system-design` (sys.path bootstrap removal touches packaging contract) -> `engineering:code-review`.
 
 - [ ] [P2] [phase-4] [code-touching] 4.6 -- Build PyInstaller bundles for the customer-shipping subset; validate on Eric's restricted-network Windows machine.
   - DoD: `dist/DocumentDataExtractor.exe` produced clean (mandatory); nimbus-skeleton equivalent if customer needs offline BPMN emission (optional per ROADMAP.md Phase 4 exit); offline smoke-test green; bundle size + load time recorded in DECISIONS.md.
   - Effort: medium (~3-4h; build + restricted-network roundtrip is the slow part).
-  - Deps: 4.1 + 4.2 + 3.2; 3.7 (Option B if formalizing nimbus-skeleton packaging).
+  - Deps: 4.1 + 4.2 + 3.2. 3.7 orphan-dir DONE 2026-05-12 (`bbcbff5`) -- option A kept all three sibling dirs tracked as proper packages, so formalizing nimbus-skeleton packaging here is a Phase-4 design call, not a Phase-3 gate.
   - Skill: `engineering:system-design` (bundle-scope decision -- include nimbus-skeleton or not?) -> `engineering:code-review`.
 
 - [ ] [P1] [phase-4] [arch] 4.7 -- Cut bundle v1.0: tag all four sub-tools at `1.0.0` simultaneously.

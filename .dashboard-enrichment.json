@@ -1,0 +1,113 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-05-13T00:00:00Z",
+  "items": {
+    "process-tools::night-auditor — GitHub MCP unavailable for nightly audit; PR/CI drift section skipped.": {
+      "question": "Should a GitHub MCP be installed/authenticated for this project, or should the night-auditor's PR/CI/push-verification section be explicitly waived?",
+      "options": [
+        { "letter": "A", "label": "Install GitHub MCP",
+          "desc": "Add a Cowork or community GitHub MCP and authenticate it for the Process-Tools repo. Restores remote-PR/CI awareness; one-time install + auth surface." },
+        { "letter": "B", "label": "Waive the PR/CI section",
+          "desc": "Amend `roles/night-auditor.md` so the remote-PR/CI/push-verification step is explicitly out of scope; auditor relies on `git reflog` / `git ls-tree` for push verification only." },
+        { "letter": "C", "label": "Defer until first miss",
+          "desc": "Keep the local-only fallback. Revisit only when an actual PR-state question matters; risk is the gap bites silently the first time it does." }
+      ],
+      "recommendation": {
+        "letter": "B",
+        "rationale": "Auditor has self-corrected on `git reflog` for two weeks with no signal loss; the install + auth cost outweighs the marginal value while no remote PRs are in flight."
+      },
+      "unblocks": "Closes the ~2-week-old NEEDS-INPUT entry and lets `roles/night-auditor.md` accurately describe its real scope.",
+      "source": {
+        "project": "process-tools",
+        "file": "NEEDS-INPUT.md",
+        "line": 22
+      }
+    },
+    "process-tools::worker-11am — QUEUE is empty of eligible items; only the blocked BPMN P1 [in-progress]…": {
+      "question": "How should the chronically-empty automation queue be addressed — by answering the BPMN gate, by promoting PROPOSED items, or by accepting the empty-queue state?",
+      "options": [
+        { "letter": "A", "label": "Answer the BPMN gate",
+          "desc": "Resolve the BPMN/Camunda P1 directly so the [in-progress] item closes and morning Workers see real work. Already partly addressed by the 2026-05-11 cowork-session — see eric-action item." },
+        { "letter": "B", "label": "Promote PROPOSED items",
+          "desc": "Approve one or more of the PROPOSED items (esp. the two P1s — commit-or-stash + `git read-tree HEAD` index refresh) so the planner can re-queue work." },
+        { "letter": "C", "label": "Accept empty-queue state",
+          "desc": "Stop treating empty-queue as a NEEDS-INPUT condition; let Workers exit clean when nothing is pickable. Simplest, but loses the daily nag that surfaces backlog stagnation." }
+      ],
+      "recommendation": {
+        "letter": "B",
+        "rationale": "Backlog has 11+ items; the two P1s are blocking-adjacent and would compound across every future morning chain. Promoting them is one evening-review pass with high leverage."
+      },
+      "unblocks": "Lets morning Worker shifts pick up actual work instead of writing daily empty-queue NEEDS-INPUT entries; clears 2 P1 PROPOSED items in the same pass.",
+      "source": {
+        "project": "process-tools",
+        "file": "NEEDS-INPUT.md",
+        "line": 29
+      }
+    },
+    "process-tools::worker-12pm — BPMN/Camunda P1": {
+      "question": "How should the BPMN/Camunda P1's unattended-approval gap be bridged — attended Worker session, Eric runs the validation, or accept structural pins as sufficient?",
+      "options": [
+        { "letter": "A", "label": "Attended Worker session (B1)",
+          "desc": "Eric stays present to click `request_access` dialogs while a Worker drives Camunda Modeler + Chrome via computer-use. Closest to the original automation framing; costs ~1 attended slot." },
+        { "letter": "B", "label": "Eric runs it himself (B2)",
+          "desc": "Eric does the ~15-minute section-2 checklist manually; queue item becomes an `[eric-action]` row. No automation changes; trades worker time for human time." },
+        { "letter": "C", "label": "Accept pins, drop GUI step (B3)",
+          "desc": "Treat the structural validator (24/24) + unittest pins (40/40) as sufficient for v1.0; drop `[in-progress]`, defer GUI gate. Lowest cost, weakest assurance." }
+      ],
+      "recommendation": {
+        "letter": "B",
+        "rationale": "Already adopted in the 2026-05-11 cowork-session; the live form is the `[eric-action / 2026-05-11]` NEEDS-INPUT row. One 15-minute pass closes the 2-week-old P1."
+      },
+      "unblocks": "QUEUE 2.5 P1 closes; CLAUDE.md task-specific waiver self-sunsets; structural-validator-extension queue items unblock.",
+      "source": {
+        "project": "process-tools",
+        "file": "JOURNAL.md",
+        "line": 384
+      }
+    },
+    "process-tools::researcher — What bounded research question would you like prioritized next": {
+      "question": "Which bounded research question should the next 04:00 researcher slot prioritize?",
+      "options": [
+        { "letter": "A", "label": "R1 — index-corruption retro",
+          "desc": "Post-fix retro on the 2026-05-06 `.git/index` corruption mechanism. Tunes how seriously to treat future trailer-SHA1 mismatch flags. Gated on the lock clearing." },
+        { "letter": "B", "label": "R2 — index.lock holder forensics",
+          "desc": "Identify which Windows-side process took the lock at 2026-04-29 17:10 UTC and never released. Requires Windows-side access (Process Monitor, Event Viewer, AV logs)." },
+        { "letter": "C", "label": "R3 — Pre-Phase-4 readiness audit",
+          "desc": "Sweep the four sub-tools for CHANGELOG depth, version-bump consistency, PyInstaller spec gaps, and offline-target smoke-test footprint before Phase 4 (bundle/cut/tag) opens." },
+        { "letter": "D", "label": "Skip — no run",
+          "desc": "Mark `[answered] no question; skip` so tomorrow's 04:00 researcher idle-exits cleanly without inventing a question." }
+      ],
+      "recommendation": {
+        "letter": "C",
+        "rationale": "De-risks the v1.0 cut, doable from the Linux audit env (no Windows-side access needed), and surfaces Phase-4 gaps before a Worker hits them mid-shift."
+      },
+      "unblocks": "Tomorrow's 04:00 researcher slot has a real grounding target; downstream Phase 4 (bundle / cut / tag) Workers start with a known gap list.",
+      "source": {
+        "project": "process-tools",
+        "file": "NEEDS-INPUT.md",
+        "line": 36
+      }
+    },
+    "process-tools::[eric-action / 2026-05-11] Run the Camunda Modeler section-2 checklist…": {
+      "question": "Will Eric run the manual Camunda Modeler section-2 checklist on the BPMN sample (and file the DECISIONS entry) now, or defer/re-route?",
+      "options": [
+        { "letter": "A", "label": "Run it now (~15 min)",
+          "desc": "Open `samples/bpmn_validation/simple_two_actors.bpmn` in Camunda Modeler 5.x desktop, walk the section-2 checklist, drag-drop to demo.bpmn.io, save + structural-diff, file the DECISIONS entry." },
+        { "letter": "B", "label": "Defer to next Cowork session",
+          "desc": "Keep the action queued; revisit when the next Cowork session has the 15-minute window. No automation regression; the P1 stays parked." },
+        { "letter": "C", "label": "Re-route to attended Worker",
+          "desc": "Restore the B1 path from the original frame — schedule an attended Worker session and have it drive Camunda Modeler + Chrome with Eric clicking `request_access` dialogs." }
+      ],
+      "recommendation": {
+        "letter": "A",
+        "rationale": "The 2026-05-11 cowork-session already chose this path; one 15-minute pass closes the 2-week-old P1 and lets the CLAUDE.md waiver self-sunset."
+      },
+      "unblocks": "QUEUE 2.5 BPMN P1 [in-progress] closes; CLAUDE.md task-specific waiver self-sunsets; structural-validator-extension QUEUE items become pickable for unattended Workers.",
+      "source": {
+        "project": "process-tools",
+        "file": "NEEDS-INPUT.md",
+        "line": 45
+      }
+    }
+  }
+}

@@ -4,11 +4,18 @@ You run hourly during the morning (8am, 9am, 10am, 11am, noon). You execute ONE 
 
 ## Your job
 
-1. Read `STATE.md`, `JOURNAL.md` (last 6h), `QUEUE.md`.
-2. Pick the top unchecked item in `QUEUE.md`. If the top item is already `[in-progress]` from a prior Worker, read its NEEDS-INPUT entry — if the human hasn't answered yet, skip and pick the next item.
-3. Verify you understand the definition of done. If the DoD is clear, proceed. If the DoD is unclear OR there's no test plan, invoke the `engineering:testing-strategy` skill to scope the work before starting. If the DoD is still ambiguous after that, write the question to `NEEDS-INPUT.md` and stop. Do not interpret the spirit — ask.
-4. Do the work. Make the changes. Run the tests. Verify your output meets the definition of done.
-5. If you finish work that touched code:
+1. Read `STATE.md`, `JOURNAL.md` (last 6h), `QUEUE.md`, `NEEDS-INPUT.md`.
+2. **Answered-marker scan (highest pull priority).** Scan `NEEDS-INPUT.md` for any `**[answered: <letter> YYYY-MM-DD via dashboard]**` markers that do NOT have a paired `**[resolved: ...]**` line below them. These are dashboard adjudications waiting for execution. If you find one, take it BEFORE pulling anything from `QUEUE.md`. The answered option (letter) is directive — execute the work it implies; do not re-litigate the decision. On completion of step 5 / step 6 (test + verify), append a line directly below the `[answered:]` marker in the exact format:
+
+   ```
+     **[resolved: YYYY-MM-DD by <worker-id>]** — <one-line summary of what shipped>
+   ```
+
+   Byte-exact: leading two-space indent, two asterisks, square brackets, em-dash (` — `, U+2014 surrounded by single spaces). `<worker-id>` is your slot id, e.g. `worker-8am`. If multiple answered-but-unresolved markers exist, take the topmost one and leave the rest for subsequent Worker slots (one item per run still holds). If the answered option's implied work is ambiguous, treat it as an ambiguous DoD per step 4 and write a NEEDS-INPUT entry — do NOT improvise. The marker contract is documented in `CLAUDE.md`.
+3. Pick the top unchecked item in `QUEUE.md`. If the top item is already `[in-progress]` from a prior Worker, read its NEEDS-INPUT entry — if the human hasn't answered yet, skip and pick the next item.
+4. Verify you understand the definition of done. If the DoD is clear, proceed. If the DoD is unclear OR there's no test plan, invoke the `engineering:testing-strategy` skill to scope the work before starting. If the DoD is still ambiguous after that, write the question to `NEEDS-INPUT.md` and stop. Do not interpret the spirit — ask.
+5. Do the work. Make the changes. Run the tests. Verify your output meets the definition of done.
+6. If you finish work that touched code:
    - BEFORE moving the item to DONE, invoke the `engineering:code-review` skill against your diff. This is mandatory for any code-touching item.
      - The review MUST explicitly check for edit-tool truncation patterns (NUL bytes, abruptly cut-off functions, missing closing brackets) — this is a recurring hazard in Process-Tools, especially in `cli.py` and `actors.py`.
      - If the review surfaces a P0 or P1 finding, do NOT move the item to DONE. Write the findings to `NEEDS-INPUT.md`, mark the `QUEUE.md` item `[in-progress]` with a pointer to the NEEDS-INPUT entry, and stop. (This is the gate that would have caught the 0.6.1/0.6.2 split-mode interaction earlier.)
@@ -17,15 +24,15 @@ You run hourly during the morning (8am, 9am, 10am, 11am, noon). You execute ONE 
    - **Local commit (REQUIRED for DONE):** before committing, pre-flight `.git/index.lock` and `.git/HEAD.lock` — if either is present and stuck, fall back to the plumbing-path workaround (`GIT_INDEX_FILE=/tmp/... git read-tree HEAD` → `git add` → `git write-tree` + `git commit-tree` + direct `printf <sha> > .git/refs/heads/<branch>`) per the worker-9am 2026-04-29 procedure. Commit with a clear message.
    - **Remote push (OPTIONAL / INFORMATIONAL):** after the local commit, attempt `git push` to your working branch via the GitHub MCP if available. If the GitHub MCP is unavailable, the push errors, or you hit a remote-side block, do NOT retry and do NOT block DONE. Append a one-line journal note: `remote push deferred — Eric pushes nightly` and proceed. Eric pushes manually every evening; the worker is not the system of record for remote state.
 
-   **Definition of DONE for a code-touching item is satisfied by:** (a) the code change made, (b) `engineering:code-review` skill passed (with the truncation/NUL-byte sweep), (c) local commit landed, (d) `JOURNAL.md` entry written. Remote-push success is NOT a DoD requirement.
-6. If you get stuck on a bug or unexpected behavior:
+   **Definition of DONE for a code-touching item is satisfied by:** (a) the code change made, (b) `engineering:code-review` skill passed (with the truncation/NUL-byte sweep), (c) local commit landed, (d) `JOURNAL.md` entry written, (e) if this run was triggered by an answered-marker pull (step 2), `**[resolved: ...]**` line appended directly below the matching `**[answered: ...]**` marker in `NEEDS-INPUT.md`. Remote-push success is NOT a DoD requirement.
+7. If you get stuck on a bug or unexpected behavior:
    - First, invoke the `engineering:debug` skill (reproduce → isolate → diagnose → fix). Time-box this to one Worker slot.
    - If debug yields a clear path forward within the slot, take it.
    - If debug doesn't yield a path forward, OR you hit a decision you can't make:
      - Append the question to `NEEDS-INPUT.md` with what you tried (including debug findings) and what you need
      - Mark the `QUEUE.md` item as `[in-progress]` with a brief note pointing to your `NEEDS-INPUT` entry
      - Stop. Do not improvise around the blocker.
-7. Append your run to `JOURNAL.md`.
+8. Append your run to `JOURNAL.md`.
 
 ## Engineering skills (use these)
 
@@ -42,7 +49,7 @@ The following skills are wired into the steps above. Reference them by exact nam
 - Do not push directly to `main` or `master`. Pushes (when attempted at all) go to a working branch.
 - Do not force-push, ever. No `--force`, no `--force-with-lease`, no equivalent.
 - Do not rewrite git history — no `git rebase -i`, no `git commit --amend` against an already-pushed ref, no `git reset --hard` that drops landed worker commits.
-- Do not block DONE on remote-push success. If the push fails or the GitHub MCP is unavailable, journal the deferral and move on (see step 5 above).
+- Do not block DONE on remote-push success. If the push fails or the GitHub MCP is unavailable, journal the deferral and move on (see step 6 above).
 - Do not delete or rewrite Worker entries from prior runs in `JOURNAL.md`.
 - Do not "scope creep" — if the task is "fix X" and you also see Y, do X, propose Y.
 - Do not skip running tests just because the change "looks fine."

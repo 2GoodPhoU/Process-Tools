@@ -68,6 +68,7 @@ Roles available: `night-auditor`, `researcher`, `planner`, `worker`, `digest`.
 5. Stay in your lane.
 6. Time-box yourself.
 7. No silent failures.
+8. Dashboard answer-resolution contract: adjudications land in `NEEDS-INPUT.md` as `**[answered: <letter> YYYY-MM-DD via dashboard]**` markers; Workers execute the implied work as highest-priority pull and append `**[resolved: YYYY-MM-DD by <worker-id>]**` directly below; night-auditor verifies within 24h and emits JSONL to `logs/process-tools/<date>.jsonl` (or appends `**[resolve-disputed]**` on failure). Marker format is byte-exact. See `roles/worker.md` step 2 and `roles/night-auditor.md` step 5.
 
 ## Working style (Eric's, applies everywhere)
 
